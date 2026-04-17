@@ -278,6 +278,50 @@ export default function App() {
     }
   }, [viewMode, txs, objetivos, budget, rendimentoMensal, streak, trialTick]);
 
+  // ── CLEAR ALL USER DATA (localStorage + state) ──
+  const clearAllUserData = useCallback(() => {
+    const keysToRemove = [
+      LS_TXS, LS_OBJ, LS_ATIVOS, LS_FE, LS_RULES, LS_PLAN,
+      LS_ONBOARDED, LS_BUDGET, LS_RENDIMENTO,
+      'fs_dash_prefs_v1', 'fs_inv_entries_v1',
+      'fs_streak_v1', 'fs_badges_v1',
+      'fs_notifications_v1', 'fs_notifications_read_v1',
+      'fs_pending_referral_code', 'fs_referral_cache_v2',
+      'fs_sub_v1', 'fs_trial_v1', 'fs_sub_prefs_v1',
+      'fuga_meta_v1',
+    ];
+    keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch {} });
+    setTxs([]); setObjetivos([]); setAtivos([]); setAtivoEntries({}); setFeEntries({});
+    setBudget({}); setRendimentoMensal(0); setUserRules([]);
+    setDashPrefs({ visible: ['hero','performance','budget','goals','mainGoal','subscriptions','gamification'] });
+    setStreak({ current: 0, best: 0, lastDate: null }); setBadges([]);
+    setNotifications([]); setReadIds([]);
+    setReferralData(null);
+    setInvDataLoaded(false);
+  }, []);
+
+  // ── ENTER APP ──
+  const enterApp = useCallback((user) => {
+    const lastUid = localStorage.getItem('fs_last_user_id');
+    if (lastUid && lastUid !== user.id) {
+      clearAllUserData();
+    }
+    localStorage.setItem('fs_last_user_id', user.id);
+    setCurrentUser(user);
+    setViewMode('app');
+    setActiveTab('dash');
+    window.scrollTo(0, 0);
+  }, [clearAllUserData]);
+
+  // ── LOGOUT ──
+  const handleLogout = useCallback(async () => {
+    const sb = getSupabaseClient();
+    if (sb) await sb.auth.signOut();
+    clearAllUserData();
+    setCurrentUser(null);
+    setViewMode('landing');
+  }, [clearAllUserData]);
+
   // ── INIT SUPABASE & CHECK SESSION ──
   useEffect(() => {
     async function init() {
@@ -383,54 +427,6 @@ export default function App() {
       syncSubscription(currentUser.id).then(() => bumpTrial());
     }
   }, [currentUser, bumpTrial]);
-
-  // ── CLEAR ALL USER DATA (localStorage + state) ──
-  const clearAllUserData = useCallback(() => {
-    // Clear ALL localStorage keys that hold user-specific data
-    const keysToRemove = [
-      LS_TXS, LS_OBJ, LS_ATIVOS, LS_FE, LS_RULES, LS_PLAN,
-      LS_ONBOARDED, LS_BUDGET, LS_RENDIMENTO,
-      'fs_dash_prefs_v1', 'fs_inv_entries_v1',
-      'fs_streak_v1', 'fs_badges_v1',
-      'fs_notifications_v1', 'fs_notifications_read_v1',
-      'fs_pending_referral_code', 'fs_referral_cache_v2',
-      'fs_sub_v1', 'fs_trial_v1', 'fs_sub_prefs_v1',
-      'fuga_meta_v1',
-    ];
-    keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch {} });
-
-    // Clear React state
-    setTxs([]); setObjetivos([]); setAtivos([]); setAtivoEntries({}); setFeEntries({});
-    setBudget({}); setRendimentoMensal(0); setUserRules([]);
-    setDashPrefs({ visible: ['hero','performance','budget','goals','mainGoal','subscriptions','gamification'] });
-    setStreak({ current: 0, best: 0, lastDate: null }); setBadges([]);
-    setNotifications([]); setReadIds([]);
-    setReferralData(null);
-    setInvDataLoaded(false);
-  }, []);
-
-  // ── ENTER APP ──
-  const enterApp = useCallback((user) => {
-    // If switching to a different user, clear previous user's cached data
-    const lastUid = localStorage.getItem('fs_last_user_id');
-    if (lastUid && lastUid !== user.id) {
-      clearAllUserData();
-    }
-    localStorage.setItem('fs_last_user_id', user.id);
-    setCurrentUser(user);
-    setViewMode('app');
-    setActiveTab('dash');
-    window.scrollTo(0, 0);
-  }, [clearAllUserData]);
-
-  // ── LOGOUT ──
-  const handleLogout = useCallback(async () => {
-    const sb = getSupabaseClient();
-    if (sb) await sb.auth.signOut();
-    clearAllUserData();
-    setCurrentUser(null);
-    setViewMode('landing');
-  }, [clearAllUserData]);
 
   // ── SWITCH TAB ──
   const switchTab = useCallback((id) => {
