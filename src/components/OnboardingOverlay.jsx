@@ -3,26 +3,49 @@ import { BUDGET_CATS } from '../utils/constants';
 
 const WELCOME_SLIDES = [
   {
-    icon: '💸',
-    title: 'Controla os teus gastos',
-    desc: 'Vê para onde vai o teu dinheiro com categorias automáticas e alertas inteligentes.',
+    icon: '🟢',
+    title: 'Bem-vindo ao Flowstate',
+    desc: 'A app portuguesa que te ajuda a organizar finanças, poupar mais e investir com confiança. Tudo num só lugar.',
+    highlight: 'Vamos mostrar-te como funciona!',
+  },
+  {
+    icon: '🏠',
+    title: 'Dashboard — O teu painel',
+    desc: 'Vê o resumo das tuas finanças num só ecrã: saldo do mês, gráficos de gastos por categoria, progresso dos objetivos e alertas de orçamento.',
+    highlight: 'Atualiza em tempo real à medida que adicionas transações.',
+  },
+  {
+    icon: '💳',
+    title: 'Transações — Controla tudo',
+    desc: 'Adiciona despesas e rendimentos manualmente. Cada transação é categorizada automaticamente e conta para o teu orçamento mensal.',
+    highlight: 'Carrega no botão + para adicionar a tua primeira transação.',
   },
   {
     icon: '🎯',
-    title: 'Define objetivos reais',
-    desc: 'Fundo de emergência, viagem, entrada de casa — acompanha o progresso de cada um.',
+    title: 'Objetivos — As tuas metas',
+    desc: 'Cria metas de poupança como fundo de emergência, viagem ou entrada de casa. Vê o progresso com barras visuais e datas estimadas.',
+    highlight: 'Define quanto queres poupar e acompanha semana a semana.',
   },
   {
     icon: '📈',
-    title: 'Faz o teu dinheiro crescer',
-    desc: 'Acompanha investimentos, ETFs e PPRs num só lugar. Tudo em português.',
+    title: 'Investimentos — Faz crescer',
+    desc: 'Regista ETFs, PPRs, ações e outros ativos. Acompanha a evolução do teu portfolio com gráficos mensais e retorno acumulado.',
+    highlight: 'Tudo em português e adaptado ao mercado PT.',
+  },
+  {
+    icon: '🏆',
+    title: 'Gamificação — Mantém-te motivado',
+    desc: 'Ganha badges por conquistas como "7 dias seguidos" ou "primeiro objetivo concluído". Mantém o streak ativo para subires de nível.',
+    highlight: 'Quanto mais usas, mais recompensas desbloqueias!',
   },
 ];
 
-const TOTAL_STEPS = 7; // 3 welcome + goal + income + budget + celebration
+const TOTAL_WELCOME = WELCOME_SLIDES.length;
+const SETUP_COUNT = 3; // goal + income + budget
+const TOTAL_STEPS = TOTAL_WELCOME + SETUP_COUNT + 1; // +1 for celebration
 
 export default function OnboardingOverlay({ budget: initialBudget, rendimentoMensal: initialRendimento, onFinish, onClose }) {
-  const [step, setStep] = useState(0); // 0-2: welcome, 3: goal, 4: income, 5: budget, 6: celebration
+  const [step, setStep] = useState(0);
   const [goal, setGoal] = useState(null);
   const [rendimento, setRendimento] = useState(initialRendimento || 0);
   const [localBudget, setLocalBudget] = useState({ ...initialBudget });
@@ -30,12 +53,11 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
   const [touchStart, setTouchStart] = useState(null);
   const containerRef = useRef(null);
 
-  // Animate step transitions
   const goStep = (s) => {
     setFadeIn(false);
     setTimeout(() => {
-      if (s === 5) {
-        // Build budget suggestions before showing budget step
+      if (s === TOTAL_WELCOME + 2) {
+        // Budget step — build suggestions
         const r = rendimento;
         const newBudget = { ...localBudget };
         BUDGET_CATS.forEach(({ cat, pct }) => {
@@ -54,17 +76,21 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
     if (touchStart === null) return;
     const diff = touchStart - e.changedTouches[0].clientX;
     if (Math.abs(diff) > 50) {
-      if (diff > 0 && step < 2) goStep(step + 1);       // swipe left → next
-      else if (diff < 0 && step > 0) goStep(step - 1);  // swipe right → prev
+      if (diff > 0 && step < TOTAL_WELCOME - 1) goStep(step + 1);
+      else if (diff < 0 && step > 0) goStep(step - 1);
     }
     setTouchStart(null);
   };
 
-  // Progress dots for welcome screens, progress bar for setup steps
-  const isWelcome = step <= 2;
-  const isSetup = step >= 3 && step <= 5;
-  const setupStep = step - 2; // 1, 2, 3 for setup steps
-  const isCelebration = step === 6;
+  const isWelcome = step < TOTAL_WELCOME;
+  const isSetup = step >= TOTAL_WELCOME && step < TOTAL_WELCOME + SETUP_COUNT;
+  const setupStep = step - TOTAL_WELCOME + 1; // 1, 2, 3
+  const isCelebration = step === TOTAL_WELCOME + SETUP_COUNT;
+
+  const goalStep = TOTAL_WELCOME;
+  const incomeStep = TOTAL_WELCOME + 1;
+  const budgetStep = TOTAL_WELCOME + 2;
+  const celebrationStep = TOTAL_WELCOME + SETUP_COUNT;
 
   const overlayStyle = {
     display: 'flex', position: 'fixed', inset: 0,
@@ -92,19 +118,18 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
     <div style={overlayStyle} ref={containerRef}>
       <div style={modalStyle}>
 
-        {/* ── WELCOME SCREENS (Steps 0-2) ── */}
+        {/* ── WELCOME SCREENS ── */}
         {isWelcome && (
           <div style={contentStyle} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
-            {/* Logo / Brand */}
+            {/* Brand header on first slide */}
             {step === 0 && (
-              <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                 <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: '.15em', color: '#00D764', textTransform: 'uppercase', marginBottom: 8 }}>FLOWSTATE</div>
-                <div style={{ fontSize: 26, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>A tua liberdade<br />financeira começa aqui.</div>
               </div>
             )}
 
             {/* Slide content */}
-            <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+            <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
               <div style={{
                 width: 80, height: 80, borderRadius: 24,
                 background: 'rgba(0,215,100,.1)', display: 'flex',
@@ -114,17 +139,20 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
               }}>
                 {WELCOME_SLIDES[step].icon}
               </div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: '.75rem' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: '.75rem', lineHeight: 1.3 }}>
                 {WELCOME_SLIDES[step].title}
               </div>
-              <div style={{ fontSize: 14, color: '#8b8fa8', lineHeight: 1.7, maxWidth: 320, margin: '0 auto' }}>
+              <div style={{ fontSize: 14, color: '#8b8fa8', lineHeight: 1.7, maxWidth: 340, margin: '0 auto .75rem' }}>
                 {WELCOME_SLIDES[step].desc}
+              </div>
+              <div style={{ fontSize: 12, color: '#00D764', fontWeight: 600, lineHeight: 1.5, maxWidth: 320, margin: '0 auto' }}>
+                {WELCOME_SLIDES[step].highlight}
               </div>
             </div>
 
             {/* Dots */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, margin: '1.5rem 0 2rem' }}>
-              {[0, 1, 2].map(i => (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 6, margin: '1.25rem 0 1.75rem' }}>
+              {WELCOME_SLIDES.map((_, i) => (
                 <div key={i} onClick={() => goStep(i)} style={{
                   width: i === step ? 24 : 8, height: 8, borderRadius: 4,
                   background: i === step ? '#00D764' : 'rgba(255,255,255,.15)',
@@ -143,22 +171,21 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
               )}
               <button onClick={() => goStep(step + 1)}
                 style={{ flex: step === 0 ? 1 : 3, padding: 14, borderRadius: 14, background: '#00D764', color: '#000', border: 'none', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>
-                {step === 2 ? 'Vamos configurar →' : 'Continuar →'}
+                {step === TOTAL_WELCOME - 1 ? 'Vamos configurar →' : 'Continuar →'}
               </button>
             </div>
 
             {/* Skip link */}
-            <button onClick={() => goStep(3)}
+            <button onClick={() => goStep(goalStep)}
               style={{ display: 'block', width: '100%', marginTop: 16, padding: 8, background: 'none', border: 'none', color: '#4a4e6a', fontSize: 12, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>
               Saltar introdução
             </button>
           </div>
         )}
 
-        {/* ── SETUP STEPS (Steps 3-5) ── */}
+        {/* ── SETUP STEPS HEADER ── */}
         {isSetup && (
           <>
-            {/* Progress bar */}
             <div style={{ display: 'flex', gap: 6, marginBottom: '2rem' }}>
               {[1, 2, 3].map(s => (
                 <div key={s} style={{ flex: 1, height: 3, borderRadius: 2, background: s <= setupStep ? '#00D764' : 'rgba(255,255,255,.12)', transition: 'background .3s' }} />
@@ -170,8 +197,8 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
           </>
         )}
 
-        {/* Step 3: Goal */}
-        {step === 3 && (
+        {/* Step: Goal */}
+        {step === goalStep && (
           <div style={contentStyle}>
             <div style={{ fontSize: '1.8rem', marginBottom: '.75rem' }}>🎯</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: '.4rem' }}>Qual é o teu objetivo?</div>
@@ -198,15 +225,15 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
                 </button>
               ))}
             </div>
-            <button onClick={() => goStep(4)} disabled={!goal}
+            <button onClick={() => goStep(incomeStep)} disabled={!goal}
               style={{ width: '100%', marginTop: '1.5rem', padding: 13, borderRadius: 12, background: '#00D764', color: '#000', border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Inter,sans-serif', opacity: goal ? 1 : .4, pointerEvents: goal ? 'auto' : 'none' }}>
               Continuar →
             </button>
           </div>
         )}
 
-        {/* Step 4: Income */}
-        {step === 4 && (
+        {/* Step: Income */}
+        {step === incomeStep && (
           <div style={contentStyle}>
             <div style={{ fontSize: '1.8rem', marginBottom: '.75rem' }}>💼</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: '.4rem' }}>Qual é o teu rendimento mensal?</div>
@@ -232,14 +259,14 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => goStep(3)} style={{ flex: 1, padding: 13, borderRadius: 12, background: 'rgba(255,255,255,.07)', color: '#6e7491', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>← Voltar</button>
-              <button onClick={() => goStep(5)} style={{ flex: 2, padding: 13, borderRadius: 12, background: '#00D764', color: '#000', border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>Continuar →</button>
+              <button onClick={() => goStep(goalStep)} style={{ flex: 1, padding: 13, borderRadius: 12, background: 'rgba(255,255,255,.07)', color: '#6e7491', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>← Voltar</button>
+              <button onClick={() => goStep(budgetStep)} style={{ flex: 2, padding: 13, borderRadius: 12, background: '#00D764', color: '#000', border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>Continuar →</button>
             </div>
           </div>
         )}
 
-        {/* Step 5: Budget */}
-        {step === 5 && (
+        {/* Step: Budget */}
+        {step === budgetStep && (
           <div style={contentStyle}>
             <div style={{ fontSize: '1.8rem', marginBottom: '.75rem' }}>📋</div>
             <div style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: '.4rem' }}>Orçamento por categoria</div>
@@ -257,7 +284,6 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
                 </div>
               ))}
             </div>
-            {/* Total indicator */}
             {rendimento > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderTop: '1px solid rgba(255,255,255,.08)', marginBottom: '1rem', fontSize: 13 }}>
                 <span style={{ color: '#6e7491' }}>Total alocado</span>
@@ -267,13 +293,13 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
               </div>
             )}
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => goStep(4)} style={{ flex: 1, padding: 13, borderRadius: 12, background: 'rgba(255,255,255,.07)', color: '#6e7491', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>← Voltar</button>
-              <button onClick={() => goStep(6)} style={{ flex: 2, padding: 13, borderRadius: 12, background: '#00D764', color: '#000', border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>Continuar →</button>
+              <button onClick={() => goStep(incomeStep)} style={{ flex: 1, padding: 13, borderRadius: 12, background: 'rgba(255,255,255,.07)', color: '#6e7491', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>← Voltar</button>
+              <button onClick={() => goStep(celebrationStep)} style={{ flex: 2, padding: 13, borderRadius: 12, background: '#00D764', color: '#000', border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>Continuar →</button>
             </div>
           </div>
         )}
 
-        {/* ── CELEBRATION SCREEN (Step 6) ── */}
+        {/* ── CELEBRATION SCREEN ── */}
         {isCelebration && (
           <div style={{ ...contentStyle, textAlign: 'center', padding: '1rem 0' }}>
             <div style={{
@@ -291,10 +317,9 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
               A tua conta está configurada.
             </div>
             <div style={{ fontSize: 13, color: '#6e7491', lineHeight: 1.6, marginBottom: '2rem', maxWidth: 300, margin: '0 auto 2rem' }}>
-              Começa por adicionar a tua primeira transação para veres a magia acontecer.
+              Vamos fazer um tour rápido pela app para saberes onde encontrar tudo.
             </div>
 
-            {/* Quick tips */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '2rem', textAlign: 'left' }}>
               {[
                 { icon: '➕', text: 'Clica no + para adicionar transações' },
@@ -320,7 +345,7 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
                 fontSize: 16, fontWeight: 800, cursor: 'pointer',
                 fontFamily: 'Inter,sans-serif',
               }}>
-              Começar a usar o Flowstate 🚀
+              Começar o tour 🚀
             </button>
 
             <style>{`

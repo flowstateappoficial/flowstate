@@ -28,6 +28,7 @@ import TransactionModal from './components/TransactionModal';
 import GoalModal from './components/GoalModal';
 import AtivoModal from './components/AtivoModal';
 import OnboardingOverlay from './components/OnboardingOverlay';
+import AppTour from './components/AppTour';
 import PaywallOverlay from './components/PaywallOverlay';
 import LegalOverlay from './components/LegalOverlay';
 import { updateStreak, evaluateBadges } from './utils/gamification';
@@ -117,6 +118,9 @@ export default function App() {
   const bumpTrial = useCallback(() => setTrialTick(t => t + 1), []);
   const [trialOfferOpen, setTrialOfferOpen] = useState(false);
   const [cancelTrialOpen, setCancelTrialOpen] = useState(false);
+
+  // ── APP TOUR (after onboarding) ──
+  const [tourOpen, setTourOpen] = useState(false);
   const [autoChargedToast, setAutoChargedToast] = useState(false);
 
   // ── PLAN ──
@@ -856,8 +860,21 @@ export default function App() {
             await saveBudgetLocal(newBudget, newRendimento);
             localStorage.setItem(LS_ONBOARDED, '1');
             setOnboardingOpen(false);
+            // Start the interactive app tour
+            setTimeout(() => setTourOpen(true), 400);
           }}
           onClose={() => setOnboardingOpen(false)}
+        />
+      )}
+
+      {tourOpen && (
+        <AppTour
+          onFinish={() => {
+            setTourOpen(false);
+            localStorage.setItem('fs_tour_done', '1');
+          }}
+          onSwitchTab={(id) => { setActiveTab(id); window.scrollTo(0, 0); }}
+          isMobile={isMobile}
         />
       )}
 
