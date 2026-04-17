@@ -4,7 +4,7 @@
  *  - Ícones / manifest / fontes:                   cache-first
  *  - API / Supabase / Stripe:                      nunca cache (sempre rede)
  */
-const VERSION = 'flowstate-20260416-012602';
+const VERSION = 'flowstate-20260417-235302';
 const SHELL_CACHE = `shell-${VERSION}`;
 const ASSETS_CACHE = `assets-${VERSION}`;
 
