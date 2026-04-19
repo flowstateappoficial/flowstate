@@ -386,13 +386,13 @@ export default function LandingPage({ logo, onShowAuth }) {
       }}>
         © 2026 Flowstate · Feito em Portugal para portugueses 🇵🇹
         <br />
-        <button onClick={() => setLegalOpen('termos')} style={{ background: 'none', border: 'none', color: '#6e7491', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: isMobile ? 10 : 11, textDecoration: 'underline', padding: 0 }}>
+        <a href="/termos" style={{ color: '#6e7491', fontFamily: 'Inter,sans-serif', fontSize: isMobile ? 10 : 11, textDecoration: 'underline' }}>
           Termos e Condições
-        </button>
+        </a>
         {' · '}
-        <button onClick={() => setLegalOpen('privacidade')} style={{ background: 'none', border: 'none', color: '#6e7491', cursor: 'pointer', fontFamily: 'Inter,sans-serif', fontSize: isMobile ? 10 : 11, textDecoration: 'underline', padding: 0 }}>
+        <a href="/privacidade" style={{ color: '#6e7491', fontFamily: 'Inter,sans-serif', fontSize: isMobile ? 10 : 11, textDecoration: 'underline' }}>
           Política de Privacidade
-        </button>
+        </a>
       </div>
 
       {legalOpen && <LegalOverlay tipo={legalOpen} onClose={() => setLegalOpen(null)} />}
