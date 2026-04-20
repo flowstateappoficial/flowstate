@@ -7,16 +7,20 @@ import { getSupabaseClient } from './supabase';
 const LS_PENDING_CODE = 'fs_pending_referral_code';  // captured from /convite/:code before signup
 const LS_CACHE = 'fs_referral_cache_v2';              // fallback cache for offline
 
+// Durante a beta fechada: recompensas são sobretudo badges + acumulação
+// de meses grátis que são entregues no lançamento público (fs_pending_rewards).
 const REWARDS = [
-  { invites: 1, reward: '🎁 +7 dias de trial', desc: 'Prolonga o teu trial atual por uma semana', type: 'trial_plus_7d' },
-  { invites: 3, reward: '🏆 Badge "Embaixador" + 1 mês Flow Plus', desc: 'Badge exclusiva + plano Plus durante 1 mês', type: 'badge_ambassador_plus_30d' },
-  { invites: 10, reward: '💎 1 mês Flow Max grátis', desc: 'Acesso total ao plano Max durante 1 mês', type: 'trial_max_30d' },
+  { invites: 1,  reward: '🌱 Primeiro amigo ativado',                    desc: 'Desbloqueia a badge "Plantador" e acumulas +7 dias de trial para o launch', type: 'first_referral' },
+  { invites: 3,  reward: '🏆 Badge "Embaixador" + 1 mês Plus no launch', desc: 'Badge exclusiva agora + 1 mês Flow Plus grátis quando o app sair da beta',    type: 'ambassador_beta' },
+  { invites: 10, reward: '💎 Badge "Top Referrer" + 1 mês Max no launch', desc: 'Badge rara + 1 mês Flow Max grátis quando o app sair da beta',                type: 'top_referrer_beta' },
 ];
 
-// Badge metadata — keyed by the slug stored in referrals.reward_details.badge by the webhook.
+// Badge metadata — keyed by the slug stored in referrals.reward_details.badge by the trigger.
 export const BADGES_META = {
-  ambassador:   { label: 'Embaixador',  icon: '🏆', color: '#f7931a', desc: '3 amigos ativados' },
-  top_referrer: { label: 'Top Referrer', icon: '💎', color: '#00D764', desc: '10 amigos ativados' },
+  beta_tester:  { label: 'Beta Tester',   icon: '🧪', color: '#7c83ff', desc: 'Apanhaste o Flowstate antes do launch' },
+  planter:      { label: 'Plantador',     icon: '🌱', color: '#4ade80', desc: 'Trouxeste o primeiro amigo' },
+  ambassador:   { label: 'Embaixador',    icon: '🏆', color: '#f7931a', desc: '3 amigos ativados' },
+  top_referrer: { label: 'Top Referrer',  icon: '💎', color: '#00D764', desc: '10 amigos ativados' },
 };
 
 // ── Pending code (capture from /convite/:code before signup) ──
@@ -82,12 +86,30 @@ export async function fetchReferralData(userId) {
       }
     } catch (e) { console.warn('badges load error:', e); }
 
+    // 4. Pending rewards (acumulados durante a beta, entregues no launch).
+    let pending = { maxMonthsPending: 0, plusMonthsPending: 0, trialWeeksPending: 0 };
+    try {
+      const { data: pendRow } = await sb
+        .from('fs_user_pending_rewards')
+        .select('max_months_pending, plus_months_pending, trial_days_pending_weeks')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (pendRow) {
+        pending = {
+          maxMonthsPending: Number(pendRow.max_months_pending ?? 0),
+          plusMonthsPending: Number(pendRow.plus_months_pending ?? 0),
+          trialWeeksPending: Number(pendRow.trial_days_pending_weeks ?? 0),
+        };
+      }
+    } catch (e) { console.warn('pending rewards load:', e); }
+
     const data = {
       code,
       invitesSent: Number(stats?.invites_sent ?? 0),
       invitesAccepted: Number(stats?.invites_accepted ?? 0),
       rewardsClaimed: Number(stats?.rewards_claimed ?? 0),
       badges,
+      pending,
     };
     saveCache(data);
     return data;
@@ -113,17 +135,51 @@ export async function applyReferralCode(code) {
   }
 }
 
-// ── Send invite ──
-// We don't have an email-sending edge function yet. This just opens the default
-// mail client with a prefilled message, and optimistically bumps local cache
-// (real invitesSent count only increments once the friend signs up via the link).
-export function sendInvite(referralData, email) {
-  if (!referralData || !email) return referralData;
+// ── Send invite (via edge function `send-referral-invite` → Resend) ──
+// Returns { ok: true, method: 'email' } | { ok: true, method: 'mailto' } | { ok: false, error: string }.
+// The edge function sends a real email via Resend and inserts a 'pending' row in referrals
+// so the invitesSent count bumps immediately (before the friend signs up).
+export async function sendInvite(referralData, email) {
+  if (!referralData || !email) return { ok: false, error: 'missing_args' };
+  const sb = getSupabaseClient();
+  if (!sb) {
+    return fallbackMailto(referralData.code, email);
+  }
+
+  try {
+    // Força envio explícito do access_token do user no Authorization.
+    // (Workaround para supabase-js com publishable keys novas, onde o
+    // auto-attach do JWT pode falhar e o gateway/função rejeitar com 401.)
+    const { data: sessData } = await sb.auth.getSession();
+    const accessToken = sessData?.session?.access_token;
+    const invokeOpts = {
+      body: { to: email.trim().toLowerCase() },
+    };
+    if (accessToken) {
+      invokeOpts.headers = { Authorization: `Bearer ${accessToken}` };
+    }
+    const { data, error } = await sb.functions.invoke('send-referral-invite', invokeOpts);
+    if (error) {
+      console.warn('send-referral-invite error:', error.message);
+      // Backend falhou → cai para mailto como último recurso.
+      return fallbackMailto(referralData.code, email);
+    }
+    if (data?.error) {
+      console.warn('send-referral-invite returned error:', data.error);
+      return { ok: false, error: data.error };
+    }
+    return { ok: true, method: 'email' };
+  } catch (e) {
+    console.warn('sendInvite error:', e);
+    return fallbackMailto(referralData.code, email);
+  }
+}
+
+function fallbackMailto(code, email) {
   const subject = encodeURIComponent('Experimenta o Flowstate comigo');
-  const body = encodeURIComponent(getShareText(referralData.code));
+  const body = encodeURIComponent(getShareText(code));
   try { window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank'); } catch {}
-  // No optimistic increment — invitesSent is derived from the referrals table.
-  return referralData;
+  return { ok: true, method: 'mailto' };
 }
 
 // ── Rewards mapping ──

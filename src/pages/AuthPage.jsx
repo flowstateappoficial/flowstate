@@ -36,18 +36,33 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
         setLoading(false);
         return;
       }
-      // ── Beta fechada: validar convite antes do registo ──
+      // ── Beta fechada: validar convite OU código de referral antes do registo ──
+      // Aceitamos duas formas de entrada:
+      //   • FS-XXXXXX  → beta_invite (gerado pelo admin)
+      //   • FLOWxxxxxx → referral_code (de um utilizador existente)
+      let codeType = null;  // 'beta' | 'referral'
       if (mode === 'register') {
-        if (!inviteCode.trim()) {
+        const code = inviteCode.trim().toUpperCase();
+        if (!code) {
           setError('Precisas de um código de convite para criar conta durante a beta fechada.');
           setLoading(false);
           return;
         }
-        const { data: valid, error: invErr } = await sb.rpc('validate_beta_invite', { p_code: inviteCode.trim() });
-        if (invErr || !valid) {
-          setError('Código de convite inválido, já usado ou expirado.');
-          setLoading(false);
-          return;
+
+        // Tenta primeiro referral (mais comum — partilhado por amigos)
+        const { data: isReferral } = await sb.rpc('fs_validate_referral_code', { p_code: code });
+        if (isReferral) {
+          codeType = 'referral';
+          try { localStorage.setItem('fs_pending_referral_code', code); } catch {}
+        } else {
+          // Fallback: beta_invite FS-XXXXXX
+          const { data: isBeta, error: invErr } = await sb.rpc('validate_beta_invite', { p_code: code });
+          if (invErr || !isBeta) {
+            setError('Código inválido, já usado ou expirado.');
+            setLoading(false);
+            return;
+          }
+          codeType = 'beta';
         }
       }
 
@@ -60,9 +75,17 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
       if (result.error) { setError(result.error.message); setLoading(false); return; }
       if (mode === 'register' && !result.data?.session) { setError('Confirma o teu email para ativar a conta.'); setLoading(false); return; }
 
-      // ── Marcar convite como usado após registo com sucesso ──
+      // ── Pós-registo: consumir beta_invite OU aplicar referral ──
       if (mode === 'register' && inviteCode.trim()) {
-        try { await sb.rpc('claim_beta_invite', { p_code: inviteCode.trim() }); } catch {}
+        const code = inviteCode.trim().toUpperCase();
+        try {
+          if (codeType === 'beta') {
+            await sb.rpc('claim_beta_invite', { p_code: code });
+          } else if (codeType === 'referral') {
+            await sb.rpc('fs_apply_referral', { p_code: code });
+            try { localStorage.removeItem('fs_pending_referral_code'); } catch {}
+          }
+        } catch {}
       }
 
       const user = result.data.user || result.data.session?.user;
@@ -134,8 +157,8 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
                 value={inviteCode}
                 onChange={e => setInviteCode(e.target.value.toUpperCase())}
                 type="text"
-                placeholder="FS-XXXXXX"
-                maxLength={12}
+                placeholder="FS-XXXXXX ou FLOW..."
+                maxLength={16}
                 style={{
                   width: '100%', height: 42, padding: '0 14px',
                   background: 'rgba(0,215,100,.08)',
@@ -146,7 +169,7 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
                 }}
               />
               <p style={{ fontSize: 10, color: '#6e7491', marginTop: 4, textAlign: 'center' }}>
-                Beta fechada — precisas de um convite para criar conta
+                Beta fechada — código de convite ou código de um amigo
               </p>
             </div>
           </>

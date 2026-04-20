@@ -770,9 +770,13 @@ export default function App() {
         {activeTab === 'convites' && (
           <ConvitesPage
             referralData={referralData}
-            onSendInvite={(email) => {
-              const updated = sendReferralInvite(referralData, email);
-              setReferralData(updated);
+            onSendInvite={async (email) => {
+              await sendReferralInvite(referralData, email);
+              // Re-puxa stats (o backend inseriu a linha pendente em `referrals`).
+              if (currentUser?.id) {
+                const fresh = await fetchReferralData(currentUser.id);
+                if (fresh) setReferralData(fresh);
+              }
             }}
           />
         )}
@@ -925,9 +929,12 @@ export default function App() {
       {referralModalOpen && (
         <ReferralInviteModal
           referralData={referralData}
-          onSendInvite={(email) => {
-            const updated = sendReferralInvite(referralData, email);
-            setReferralData(updated);
+          onSendInvite={async (email) => {
+            await sendReferralInvite(referralData, email);
+            if (currentUser?.id) {
+              const fresh = await fetchReferralData(currentUser.id);
+              if (fresh) setReferralData(fresh);
+            }
           }}
           onClose={() => setReferralModalOpen(false)}
         />

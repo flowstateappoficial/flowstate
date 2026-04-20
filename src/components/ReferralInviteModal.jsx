@@ -9,9 +9,9 @@ export default function ReferralInviteModal({ referralData, onSendInvite, onClos
   const { all } = getRewardsInfo(referralData?.invitesAccepted || 0);
   const link = getReferralLink(referralData?.code || '');
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!email.includes('@')) return;
-    onSendInvite(email);
+    try { await onSendInvite(email); } catch {}
     setSent(true);
     setEmail('');
     setTimeout(() => setSent(false), 3000);

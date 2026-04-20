@@ -17,7 +17,7 @@ export default function ConvitesPage({ referralData, onSendInvite }) {
     </div>
   );
 
-  const { code, invitesSent, invitesAccepted, rewardsClaimed = 0, badges = [] } = referralData;
+  const { code, invitesSent, invitesAccepted, rewardsClaimed = 0, badges = [], pending = {} } = referralData;
   const { unlocked, next, all } = getRewardsInfo(invitesAccepted);
   const fmtDate = (iso) => {
     if (!iso) return '';
@@ -25,10 +25,11 @@ export default function ConvitesPage({ referralData, onSendInvite }) {
   };
   const link = getReferralLink(code);
   const progressToNext = next ? Math.round((invitesAccepted / next.invites) * 100) : 100;
+  const hasPending = (pending.maxMonthsPending || 0) + (pending.plusMonthsPending || 0) + (pending.trialWeeksPending || 0) > 0;
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!email.includes('@')) return;
-    onSendInvite(email);
+    try { await onSendInvite(email); } catch {}
     setSent(true);
     setEmail('');
     setTimeout(() => setSent(false), 3000);
@@ -46,12 +47,30 @@ export default function ConvitesPage({ referralData, onSendInvite }) {
   return (
     <div id="page-convites" className="page active" style={{ paddingTop: '1rem' }}>
       {/* Page header */}
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 24, fontWeight: 900, color: '#fff', marginBottom: 6 }}>
           🎁 Convites
         </div>
         <div style={{ fontSize: 14, color: '#6e7491' }}>
           Convida amigos para o Flowstate e desbloqueia recompensas exclusivas
+        </div>
+      </div>
+
+      {/* Beta banner */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(124,131,255,.10) 0%, rgba(0,215,100,.06) 100%)',
+        border: '1px solid rgba(124,131,255,.25)',
+        borderRadius: 16, padding: isMobile ? '14px 14px' : '16px 20px',
+        marginBottom: 24, display: 'flex', gap: 14, alignItems: 'flex-start',
+      }}>
+        <div style={{ fontSize: 22, lineHeight: 1 }}>🧪</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
+            Estás na beta fechada — o teu código dá acesso direto
+          </div>
+          <div style={{ fontSize: 12, color: '#b8bfda', lineHeight: 1.5 }}>
+            Cada amigo que se regista com o teu código entra sem lista de espera. A ativação conta quando ele criar <strong style={{ color: '#fff' }}>3 transações</strong>. Durante a beta ganhas <strong style={{ color: '#fff' }}>badges</strong>; os meses grátis (Plus / Max) ficam acumulados e são entregues no lançamento público.
+          </div>
         </div>
       </div>
 
@@ -75,6 +94,44 @@ export default function ConvitesPage({ referralData, onSendInvite }) {
           </div>
         ))}
       </div>
+
+      {/* Pending rewards — acumulado para o launch */}
+      {hasPending && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(0,215,100,.07) 0%, rgba(247,147,26,.05) 100%)',
+          border: '1px solid rgba(0,215,100,.2)',
+          borderRadius: 20, padding: isMobile ? '16px 14px' : '20px 24px',
+          marginBottom: 24,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+            <div style={{ fontSize: 20 }}>🏦</div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Poupa-te no launch</div>
+              <div style={{ fontSize: 11, color: '#8892b0', marginTop: 2 }}>
+                Recompensas acumuladas — entregues quando o Flowstate sair da beta
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, minmax(0,1fr))', gap: 10 }}>
+            {[
+              { k: 'maxMonthsPending',  icon: '💎', label: 'Meses Flow Max',  val: pending.maxMonthsPending || 0,  color: '#00D764' },
+              { k: 'plusMonthsPending', icon: '🏆', label: 'Meses Flow Plus', val: pending.plusMonthsPending || 0, color: '#f7931a' },
+              { k: 'trialWeeksPending', icon: '🎁', label: 'Semanas de trial', val: pending.trialWeeksPending || 0, color: '#7b7fff' },
+            ].map(r => (
+              <div key={r.k} style={{
+                padding: '12px 14px', borderRadius: 12,
+                background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)',
+                opacity: r.val === 0 ? 0.45 : 1,
+              }}>
+                <div style={{ fontSize: 11, color: '#8892b0', marginBottom: 6 }}>
+                  {r.icon} {r.label}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: r.color }}>{r.val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Badges ganhas */}
       {badges.length > 0 && (
@@ -292,9 +349,9 @@ export default function ConvitesPage({ referralData, onSendInvite }) {
         <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 12 }}>Como funciona?</div>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: isMobile ? 10 : 16 }}>
           {[
-            { step: '1', title: 'Convida', desc: 'Partilha o teu código ou envia um email ao teu amigo', icon: '📨' },
-            { step: '2', title: 'Amigo ativa', desc: 'Registo + onboarding + 3 transações = ativação completa', icon: '✅' },
-            { step: '3', title: 'Ganha', desc: 'Recompensas desbloqueadas automaticamente na tua conta', icon: '🎁' },
+            { step: '1', title: 'Convida', desc: 'Partilha o teu código — dá acesso direto à beta, sem lista de espera', icon: '📨' },
+            { step: '2', title: 'Amigo ativa', desc: 'Regista-se com o teu código e cria 3 transações', icon: '✅' },
+            { step: '3', title: 'Ganha', desc: 'Badges agora + meses Plus/Max acumulados para o launch', icon: '🎁' },
           ].map((s, i) => (
             <div key={i} style={{ textAlign: 'center', padding: '16px 12px' }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>{s.icon}</div>
@@ -303,8 +360,8 @@ export default function ConvitesPage({ referralData, onSendInvite }) {
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(247,147,26,.06)', border: '1px solid rgba(247,147,26,.1)', fontSize: 12, color: '#f7931a' }}>
-          ⚡ Limite de 10 convites por mês para garantir qualidade do programa
+        <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(123,127,255,.06)', border: '1px solid rgba(123,127,255,.15)', fontSize: 12, color: '#b8bfda' }}>
+          🧪 Durante a beta, convida só pessoas que realmente acham o Flowstate útil — isso garante que os testes têm qualidade.
         </div>
       </div>
     </div>
