@@ -190,9 +190,12 @@ export function getRewardsInfo(invitesAccepted) {
 }
 
 // ── Share helpers ──
+// Nota: usamos o domínio custom hardcoded para garantir que links partilhados
+// não ficam presos a URLs de preview da Vercel (que podem ser apagados).
+const PUBLIC_ORIGIN = 'https://www.flowstateapp.pt';
+
 export function getReferralLink(code) {
-  const origin = (typeof window !== 'undefined' && window.location?.origin) || 'https://flowstate.pt';
-  return `${origin}/convite/${code}`;
+  return `${PUBLIC_ORIGIN}/convite/${code}`;
 }
 
 export function getShareText(code) {
