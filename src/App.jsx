@@ -326,29 +326,67 @@ export default function App() {
   }, [clearAllUserData]);
 
   // ── INIT SUPABASE & CHECK SESSION ──
+  //
+  // Nota sobre OAuth (Google): quando o user volta do provider, a URL
+  // contém ?code=xxxx. O supabase-js com detectSessionInUrl:true faz a
+  // troca code→session de forma ASSÍNCRONA. Se chamarmos getSession()
+  // demasiado cedo, retorna null e o user cai na landing page. A fix
+  // é adicionar um listener onAuthStateChange que apanha o SIGNED_IN
+  // quando a sessão fica disponível.
   useEffect(() => {
-    async function init() {
-      const sb = getSupabaseClient();
-      if (sb) {
-        try {
-          const { data } = await sb.auth.getSession();
-          if (data?.session) {
-            const uid = data.session.user.id;
-            const lastUid = localStorage.getItem('fs_last_user_id');
-            // If a different user is now logged in, clear old user's cached data
-            if (lastUid && lastUid !== uid) {
-              clearAllUserData();
-            }
-            localStorage.setItem('fs_last_user_id', uid);
-            setCurrentUser(data.session.user);
-            setViewMode('app');
-            return;
-          }
-        } catch {}
+    const sb = getSupabaseClient();
+
+    const applySession = (user) => {
+      const uid = user.id;
+      const lastUid = localStorage.getItem('fs_last_user_id');
+      if (lastUid && lastUid !== uid) {
+        clearAllUserData();
       }
-      setViewMode('landing');
+      localStorage.setItem('fs_last_user_id', uid);
+      setCurrentUser(user);
+      setViewMode('app');
+      // Limpa query params de OAuth (?code=...) da URL para não re-disparar.
+      if (window.location.search.includes('code=') || window.location.hash.includes('access_token=')) {
+        try { window.history.replaceState({}, '', window.location.pathname); } catch {}
+      }
+    };
+
+    async function init() {
+      if (!sb) { setViewMode('landing'); return; }
+      try {
+        const { data } = await sb.auth.getSession();
+        if (data?.session) {
+          applySession(data.session.user);
+          return;
+        }
+      } catch {}
+      // Se há ?code= na URL, o detectSessionInUrl ainda não terminou.
+      // Ficamos em 'loading' — o onAuthStateChange abaixo vai apanhar o SIGNED_IN.
+      const hasOAuthParams =
+        window.location.search.includes('code=') ||
+        window.location.hash.includes('access_token=');
+      if (!hasOAuthParams) {
+        setViewMode('landing');
+      }
+      // Timeout defensivo: se o OAuth exchange falhar em 6s, vai para landing.
+      setTimeout(() => {
+        setViewMode(v => (v === 'loading' ? 'landing' : v));
+      }, 6000);
     }
     init();
+
+    if (!sb) return;
+    const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+        applySession(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setViewMode('landing');
+      }
+    });
+    return () => {
+      try { sub?.subscription?.unsubscribe?.(); } catch {}
+    };
   }, [clearAllUserData]);
 
   // ── SYNC WITH SUPABASE WHEN ENTERING APP ──
