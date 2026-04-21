@@ -182,6 +182,42 @@ function fallbackMailto(code, email) {
   return { ok: true, method: 'mailto' };
 }
 
+// ── Log generic invite share (WhatsApp, copy link, web share, ...) ──
+// Insere uma linha em `referrals` com referred_user_id=null via RPC.
+// Necessário porque `wa.me/?text=...` e clipboard.writeText() nunca tocam
+// o backend — sem esta chamada, o contador invites_sent nunca sobe.
+//
+// `channel` recomendado: 'whatsapp' | 'link_copy' | 'web_share' | 'telegram' | 'email_manual'.
+//
+// Cooldown client-side de 2s por canal para evitar duplo-clique acidental.
+const SHARE_COOLDOWN_MS = 2000;
+const _shareLastAt = new Map(); // channel → timestamp
+
+export async function logInviteShare(channel) {
+  const ch = (channel || 'unknown').toString().toLowerCase();
+  const now = Date.now();
+  const last = _shareLastAt.get(ch) || 0;
+  if (now - last < SHARE_COOLDOWN_MS) {
+    return { ok: false, error: 'cooldown' };
+  }
+  _shareLastAt.set(ch, now);
+
+  const sb = getSupabaseClient();
+  if (!sb) return { ok: false, error: 'no_supabase' };
+
+  try {
+    const { data, error } = await sb.rpc('fs_log_invite_share', { p_channel: ch });
+    if (error) {
+      console.warn('fs_log_invite_share:', error.message);
+      return { ok: false, error: error.message };
+    }
+    return { ok: true, id: data };
+  } catch (e) {
+    console.warn('logInviteShare error:', e);
+    return { ok: false, error: 'exception' };
+  }
+}
+
 // ── Rewards mapping ──
 export function getRewardsInfo(invitesAccepted) {
   const unlocked = REWARDS.filter(r => invitesAccepted >= r.invites);

@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import useIsMobile from '../hooks/useIsMobile';
 import { getRewardsInfo, getReferralLink, getShareText, BADGES_META } from '../utils/referral';
 
-export default function ConvitesPage({ referralData, onSendInvite }) {
+export default function ConvitesPage({ referralData, onSendInvite, onLogShare }) {
   const isMobile = useIsMobile();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   if (!referralData) return (
     <div id="page-convites" className="page active" style={{ paddingTop: '1rem' }}>
@@ -38,10 +39,16 @@ export default function ConvitesPage({ referralData, onSendInvite }) {
   const shareWhatsApp = () => {
     const text = encodeURIComponent(getShareText(code));
     window.open(`https://wa.me/?text=${text}`, '_blank');
+    // Regista a partilha no backend para fazer bump ao contador `invites_sent`.
+    // Disparado "fire-and-forget"; o onLogShare refaz o fetch e actualiza UI.
+    if (onLogShare) onLogShare('whatsapp');
   };
 
   const copyLink = () => {
     navigator.clipboard.writeText(link).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    if (onLogShare) onLogShare('link_copy');
   };
 
   return (
@@ -224,13 +231,21 @@ export default function ConvitesPage({ referralData, onSendInvite }) {
               padding: '14px 10px', borderRadius: 14, border: '1px solid rgba(123,127,255,.2)',
               background: 'rgba(123,127,255,.08)', cursor: 'pointer', textAlign: 'center'
             }}>
-              <div style={{ fontSize: 20, marginBottom: 4 }}>🔗</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#7b7fff' }}>Copiar link</div>
+              <div style={{ fontSize: 20, marginBottom: 4 }}>{copied ? '✅' : '🔗'}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#7b7fff' }}>
+                {copied ? 'Copiado!' : 'Copiar link'}
+              </div>
             </button>
             <button onClick={() => {
               const text = getShareText(code);
-              if (navigator.share) navigator.share({ title: 'Flowstate', text }).catch(() => {});
-              else navigator.clipboard.writeText(text).catch(() => {});
+              if (navigator.share) {
+                navigator.share({ title: 'Flowstate', text })
+                  .then(() => { if (onLogShare) onLogShare('web_share'); })
+                  .catch(() => {});
+              } else {
+                navigator.clipboard.writeText(text).catch(() => {});
+                if (onLogShare) onLogShare('link_copy');
+              }
             }} style={{
               padding: '14px 10px', borderRadius: 14, border: '1px solid rgba(0,215,100,.2)',
               background: 'rgba(0,215,100,.08)', cursor: 'pointer', textAlign: 'center'

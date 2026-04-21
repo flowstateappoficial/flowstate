@@ -35,7 +35,7 @@ import { updateStreak, evaluateBadges } from './utils/gamification';
 import { evaluateNotifications, evaluateTrialNotifications, loadNotifications, loadReadIds, markAllRead as markAllReadUtil } from './utils/notifications';
 import NotificationCenter from './components/NotificationCenter';
 import FeedbackButton from './components/FeedbackButton';
-import { initReferralData, sendInvite as sendReferralInvite, fetchReferralData, setPendingReferralCode, getPendingReferralCode, clearPendingReferralCode, applyReferralCode } from './utils/referral';
+import { initReferralData, sendInvite as sendReferralInvite, fetchReferralData, setPendingReferralCode, getPendingReferralCode, clearPendingReferralCode, applyReferralCode, logInviteShare } from './utils/referral';
 import ReferralInviteModal from './components/ReferralInviteModal';
 import ConvitesPage from './pages/ConvitesPage';
 import AdminInvitesPage from './pages/AdminInvitesPage';
@@ -911,6 +911,17 @@ export default function App() {
                 const fresh = await fetchReferralData(currentUser.id);
                 if (fresh) setReferralData(fresh);
               }
+            }}
+            onLogShare={async (channel) => {
+              // Optimistic bump para feedback imediato na UI.
+              setReferralData(prev => prev ? { ...prev, invitesSent: (prev.invitesSent || 0) + 1 } : prev);
+              const res = await logInviteShare(channel);
+              // Re-sincronizar com o backend (cobre cooldown / erros).
+              if (currentUser?.id) {
+                const fresh = await fetchReferralData(currentUser.id);
+                if (fresh) setReferralData(fresh);
+              }
+              return res;
             }}
           />
         )}
