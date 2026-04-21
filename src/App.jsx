@@ -329,14 +329,23 @@ export default function App() {
   //
   // Nota sobre OAuth (Google): quando o user volta do provider, a URL
   // contém ?code=xxxx. O supabase-js com detectSessionInUrl:true faz a
-  // troca code→session de forma ASSÍNCRONA. Se chamarmos getSession()
-  // demasiado cedo, retorna null e o user cai na landing page. A fix
-  // é adicionar um listener onAuthStateChange que apanha o SIGNED_IN
-  // quando a sessão fica disponível.
+  // troca code→session de forma ASSÍNCRONA. Há várias armadilhas:
+  //   1) Se chamarmos getSession() antes do listener estar registado,
+  //      podemos perder o evento SIGNED_IN disparado durante o await.
+  //   2) Se o detectSessionInUrl falhar silenciosamente (ex. code_verifier
+  //      inconsistente depois de um signOut + segundo login), o user
+  //      ficava eternamente em 'loading' e o timeout atirava-o à landing.
+  //
+  // Por isso registamos PRIMEIRO o listener e depois, se existe ?code=
+  // na URL, forçamos um exchangeCodeForSession explícito como fallback.
   useEffect(() => {
     const sb = getSupabaseClient();
+    if (!sb) { setViewMode('landing'); return; }
 
+    let applied = false;
     const applySession = (user) => {
+      if (applied) return;
+      applied = true;
       const uid = user.id;
       const lastUid = localStorage.getItem('fs_last_user_id');
       if (lastUid && lastUid !== uid) {
@@ -351,39 +360,62 @@ export default function App() {
       }
     };
 
-    async function init() {
-      if (!sb) { setViewMode('landing'); return; }
-      try {
-        const { data } = await sb.auth.getSession();
-        if (data?.session) {
-          applySession(data.session.user);
-          return;
-        }
-      } catch {}
-      // Se há ?code= na URL, o detectSessionInUrl ainda não terminou.
-      // Ficamos em 'loading' — o onAuthStateChange abaixo vai apanhar o SIGNED_IN.
-      const hasOAuthParams =
-        window.location.search.includes('code=') ||
-        window.location.hash.includes('access_token=');
-      if (!hasOAuthParams) {
-        setViewMode('landing');
-      }
-      // Timeout defensivo: se o OAuth exchange falhar em 6s, vai para landing.
-      setTimeout(() => {
-        setViewMode(v => (v === 'loading' ? 'landing' : v));
-      }, 6000);
-    }
-    init();
-
-    if (!sb) return;
+    // 1) Listener primeiro — nunca pode perder um evento.
     const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session?.user) {
         applySession(session.user);
       } else if (event === 'SIGNED_OUT') {
+        applied = false;
         setCurrentUser(null);
         setViewMode('landing');
       }
     });
+
+    // 2) Depois, tenta resolver a sessão ativa ou fazer o exchange OAuth.
+    (async () => {
+      const hasOAuthCode = window.location.search.includes('code=');
+      const hasOAuthHash = window.location.hash.includes('access_token=');
+
+      try {
+        const { data } = await sb.auth.getSession();
+        if (data?.session?.user) {
+          applySession(data.session.user);
+          return;
+        }
+      } catch {}
+
+      // Se não há sessão mas há code na URL, força o exchange manualmente.
+      // Isto cobre o caso em que detectSessionInUrl falha silenciosamente
+      // (p.ex. code_verifier stale após segundo login OAuth).
+      if (hasOAuthCode) {
+        try {
+          const { data, error } = await sb.auth.exchangeCodeForSession(window.location.href);
+          if (!error && data?.session?.user) {
+            applySession(data.session.user);
+            return;
+          }
+          // Exchange falhou — limpa query string e cai na landing.
+          try { window.history.replaceState({}, '', window.location.pathname); } catch {}
+          if (!applied) setViewMode('landing');
+          return;
+        } catch {
+          try { window.history.replaceState({}, '', window.location.pathname); } catch {}
+          if (!applied) setViewMode('landing');
+          return;
+        }
+      }
+
+      // Sem sessão e sem OAuth pendente: landing.
+      if (!hasOAuthHash && !applied) {
+        setViewMode('landing');
+      }
+
+      // Fallback extremo: se tudo falhar e ficarmos presos em 'loading' após 10s.
+      setTimeout(() => {
+        setViewMode(v => (v === 'loading' ? 'landing' : v));
+      }, 10000);
+    })();
+
     return () => {
       try { sub?.subscription?.unsubscribe?.(); } catch {}
     };

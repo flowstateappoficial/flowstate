@@ -111,8 +111,19 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
   const handleGoogle = async () => {
     const sb = getSupabaseClient();
     if (!sb) return;
-    try { await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.href } }); }
-    catch (e) { setError(e.message); }
+    try {
+      // redirectTo sempre à raiz do domínio (limpo, sem query/hash stale
+      // de tentativas anteriores). prompt=select_account força o Google
+      // a mostrar o picker mesmo que já exista sessão, o que é essencial
+      // quando o utilizador está a trocar de conta depois de fazer logout.
+      await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/',
+          queryParams: { prompt: 'select_account' },
+        },
+      });
+    } catch (e) { setError(e.message); }
   };
 
   const handleBypass = () => {
