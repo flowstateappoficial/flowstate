@@ -66,7 +66,7 @@ export default function PricingPage({ billingAnual, setBillingAnual, logo, onSho
             <div style={{ position: 'absolute', top: 4, left: billingAnual ? 28 : 4, width: 20, height: 20, borderRadius: '50%', background: '#00D764', transition: 'left .25s', boxShadow: '0 0 8px rgba(0,215,100,.6)' }} />
           </div>
           <span style={{ fontSize: 13, fontWeight: 600, color: billingAnual ? 'var(--t1)' : 'var(--t3)' }}>
-            Anual <span style={{ marginLeft: 6, fontSize: 10, background: 'rgba(0,215,100,.15)', color: '#00D764', padding: '3px 8px', borderRadius: 20, fontWeight: 800, letterSpacing: '.04em' }}>POUPA 25%</span>
+            Anual <span style={{ marginLeft: 6, fontSize: 10, background: 'rgba(0,215,100,.15)', color: '#00D764', padding: '3px 8px', borderRadius: 20, fontWeight: 800, letterSpacing: '.04em' }}>POUPA</span>
           </span>
         </div>
 
