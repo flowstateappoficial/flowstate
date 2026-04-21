@@ -10,12 +10,6 @@
 //   SUPABASE_URL            (auto in Supabase)
 //   SUPABASE_SERVICE_ROLE_KEY (auto in Supabase)
 //   APP_URL                 https://your-app.com (used for success/cancel redirects)
-//
-// Client call:
-//   const { data } = await supabase.functions.invoke('create-checkout-session', {
-//     body: { plan: 'plus', interval: 'month', withTrial: true }
-//   });
-//   window.location.href = data.url;
 
 import Stripe from 'https://esm.sh/stripe@14.25.0?target=deno';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
@@ -51,8 +45,6 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
-    // Pass the token explicitly — required when the client is built with the
-    // service-role key (otherwise getUser() reads no session).
     const { data: userRes, error: userErr } = await supa.auth.getUser(token);
     if (userErr || !userRes?.user) {
       return json({ error: 'not_authenticated', detail: userErr?.message }, 401);
@@ -82,7 +74,6 @@ Deno.serve(async (req) => {
         metadata: { user_id: user.id },
       });
       customerId = customer.id;
-      // Upsert a stub row so we don't create duplicate customers on retry.
       await supa.from('subscriptions').upsert({
         user_id: user.id,
         stripe_customer_id: customerId,
@@ -91,17 +82,71 @@ Deno.serve(async (req) => {
       }, { onConflict: 'user_id' });
     }
 
+    // ── Recompensas da beta ──────────────────────────────────────
+    // Se o user tem recompensas pendentes (delivered_at not null, redeemed_at null),
+    // converte-as em: coupon Stripe N meses 100% off (se plano Plus) + trial estendido.
+    // IMPORTANTE: só redime se o user está a subscrever PLUS. Se for Max, deixa
+    // as recompensas intactas para um futuro downgrade/resubscribe em Plus.
+    let trialDays = withTrial ? 7 : 0;
+    const discounts: Array<{ coupon: string }> = [];
+
+    if (plan === 'plus') {
+      const { data: redeemData, error: redeemErr } = await supa.rpc('fs_redeem_beta_rewards', {
+        p_user_id: user.id,
+      });
+
+      if (redeemErr) {
+        console.warn('fs_redeem_beta_rewards failed (prossigo sem rewards):', redeemErr.message);
+      } else if (redeemData) {
+        const plusMonths = redeemData.plus_months ?? 0;
+        const extraTrialDays = redeemData.trial_days ?? 0;
+        const redeemedIds: string[] = redeemData.redeemed_ids ?? [];
+
+        if (extraTrialDays > 0) {
+          trialDays = trialDays + extraTrialDays;
+        }
+
+        if (plusMonths > 0) {
+          try {
+            const coupon = await stripe.coupons.create({
+              percent_off: 100,
+              duration: plusMonths >= 12 ? 'forever' : 'repeating',
+              duration_in_months: plusMonths >= 12 ? undefined : plusMonths,
+              name: `Recompensa Beta Flowstate - ${plusMonths} meses Plus`,
+              metadata: {
+                user_id: user.id,
+                source: 'beta_rewards',
+                plus_months: String(plusMonths),
+                redeemed_reward_ids: redeemedIds.join(','),
+              },
+            });
+            discounts.push({ coupon: coupon.id });
+          } catch (e) {
+            // Rollback do redeem se o coupon falhar — user não perde recompensas.
+            console.error('stripe.coupons.create failed:', e);
+            if (redeemedIds.length > 0) {
+              await supa
+                .from('fs_pending_rewards')
+                .update({ redeemed_at: null })
+                .in('id', redeemedIds);
+            }
+          }
+        }
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {
-        trial_period_days: withTrial ? 7 : undefined,
+        trial_period_days: trialDays > 0 ? trialDays : undefined,
         metadata: { user_id: user.id, plan },
       },
-      // Charge the card automatically at trial end. Card is required upfront.
       payment_method_collection: 'always',
-      allow_promotion_codes: true,
+      // Quando temos um coupon pre-aplicado, Stripe não permite promotion codes ao mesmo tempo.
+      allow_promotion_codes: discounts.length === 0,
+      discounts: discounts.length > 0 ? discounts : undefined,
       success_url: `${APP_URL}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url:  `${APP_URL}/?checkout=cancel`,
       locale: 'pt',

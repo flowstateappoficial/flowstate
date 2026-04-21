@@ -9,7 +9,7 @@ const PLAN_CFG = {
   max: { label: 'FLOW MAX', bg: 'rgba(123,127,255,.15)', color: '#7b7fff', border: '1px solid rgba(123,127,255,.3)' },
 };
 
-const ADMIN_EMAILS = ['flowstate.app.oficial@gmail.com', 'claudionobre8@gmail.com'];
+const ADMIN_EMAILS = ['flowstate.app.oficial@gmail.com'];
 
 const BASE_TABS = [
   { id: 'dash', label: 'Dashboard' },
