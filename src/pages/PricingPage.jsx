@@ -2,9 +2,11 @@ import React from 'react';
 import { PRICES } from '../utils/constants';
 import { getTrialStatus } from '../utils/trial';
 import useIsMobile from '../hooks/useIsMobile';
+import useBetaStatus from '../hooks/useBetaStatus';
 
 export default function PricingPage({ billingAnual, setBillingAnual, logo, onShowAuth, onStartTrial, onSubscribe }) {
   const isMobile = useIsMobile();
+  const { isBetaActive } = useBetaStatus();
   const trialStatus = getTrialStatus();
   const canStartTrial = !trialStatus.hasTrial;
   const trialActive = trialStatus.active;
@@ -45,13 +47,15 @@ export default function PricingPage({ billingAnual, setBillingAnual, logo, onSho
             <span style={{ background: 'linear-gradient(135deg,#00D764,#00b4d8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>A tua liberdade financeira começa aqui.</span>
           </h1>
           <p style={{ fontSize: 14, color: '#6e7491', maxWidth: 440, margin: '0 auto', lineHeight: 1.75 }}>
-            {canStartTrial
-              ? '7 dias grátis, depois 3,99 €/mês. Cancela quando quiseres.'
-              : trialActive
-                ? (trialStatus.autoRenew
-                    ? `Trial ativo — faltam ${trialStatus.daysLeft} ${trialStatus.daysLeft === 1 ? 'dia' : 'dias'}. Serás cobrado automaticamente, cancela antes se não quiseres continuar.`
-                    : `Trial cancelado — mantém acesso durante mais ${trialStatus.daysLeft} ${trialStatus.daysLeft === 1 ? 'dia' : 'dias'}. Reativa para continuar com Flow Plus.`)
-                : 'Cancela a qualquer momento.'}
+            {isBetaActive
+              ? 'Estamos em beta fechada. A subscrição Plus ficará disponível no final da beta — os teus meses Plus acumulados através de convites serão aplicados automaticamente.'
+              : canStartTrial
+                ? '7 dias grátis, depois 3,99 €/mês. Cancela quando quiseres.'
+                : trialActive
+                  ? (trialStatus.autoRenew
+                      ? `Trial ativo — faltam ${trialStatus.daysLeft} ${trialStatus.daysLeft === 1 ? 'dia' : 'dias'}. Serás cobrado automaticamente, cancela antes se não quiseres continuar.`
+                      : `Trial cancelado — mantém acesso durante mais ${trialStatus.daysLeft} ${trialStatus.daysLeft === 1 ? 'dia' : 'dias'}. Reativa para continuar com Flow Plus.`)
+                  : 'Cancela a qualquer momento.'}
           </p>
         </div>
 
@@ -65,6 +69,33 @@ export default function PricingPage({ billingAnual, setBillingAnual, logo, onSho
             Anual <span style={{ marginLeft: 6, fontSize: 10, background: 'rgba(0,215,100,.15)', color: '#00D764', padding: '3px 8px', borderRadius: 20, fontWeight: 800, letterSpacing: '.04em' }}>POUPA 25%</span>
           </span>
         </div>
+
+        {/* Beta banner — shown while beta_ended_at is not set */}
+        {isBetaActive && (
+          <div style={{
+            maxWidth: 720, margin: '0 auto 2rem',
+            padding: isMobile ? '14px 16px' : '16px 22px',
+            borderRadius: 16,
+            background: 'linear-gradient(135deg, rgba(0,215,100,.12), rgba(123,127,255,.10))',
+            border: '1px solid rgba(0,215,100,.3)',
+            display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', gap: 14,
+            flexDirection: isMobile ? 'column' : 'row',
+          }}>
+            <div style={{
+              flexShrink: 0, width: 44, height: 44, borderRadius: 12,
+              background: 'rgba(0,215,100,.18)', display: 'flex',
+              alignItems: 'center', justifyContent: 'center', fontSize: 22,
+            }}>🔒</div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#00D764', letterSpacing: '.02em', marginBottom: 4 }}>
+                Subscrições fechadas durante a beta
+              </div>
+              <div style={{ fontSize: 12, color: '#9ba3c4', lineHeight: 1.55 }}>
+                Os planos Plus e Max ficarão disponíveis assim que a beta fechada terminar. Os meses Plus que ganhaste a convidar amigos serão aplicados automaticamente no teu primeiro checkout.
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: isMobile ? 14 : 20, alignItems: 'start' }}>
@@ -100,7 +131,11 @@ export default function PricingPage({ billingAnual, setBillingAnual, logo, onSho
                 <div key={f} style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Check /><span style={{ fontSize: 13, color: '#9ba3c4', fontWeight: i === 1 || i === 2 ? 700 : 400 }}>{f}</span></div>
               ))}
             </div>
-            {canStartTrial && onStartTrial ? (
+            {isBetaActive ? (
+              <button disabled title="Disponível no final da beta" style={{ width: '100%', padding: 13, borderRadius: 12, background: 'rgba(0,215,100,.12)', color: '#00D764', border: '1px solid rgba(0,215,100,.3)', fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'not-allowed', opacity: .85 }}>
+                🔒 Disponível após a beta
+              </button>
+            ) : canStartTrial && onStartTrial ? (
               <button onClick={onStartTrial} style={{ width: '100%', padding: 13, borderRadius: 12, background: '#00D764', color: '#000', border: 'none', fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer', boxShadow: '0 0 30px rgba(0,215,100,.3)' }}>
                 🎁 Experimentar 7 dias grátis
               </button>
@@ -124,9 +159,15 @@ export default function PricingPage({ billingAnual, setBillingAnual, logo, onSho
                 <div key={f} style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Check /><span style={{ fontSize: 13, color: '#9ba3c4', fontWeight: i >= 1 && i <= 3 ? 700 : 400 }}>{f}</span></div>
               ))}
             </div>
-            <button onClick={() => onSubscribe && onSubscribe('max')} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'rgba(123,127,255,.15)', color: '#7b7fff', border: '1px solid rgba(123,127,255,.3)', fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>
-              Assinar Flow Max
-            </button>
+            {isBetaActive ? (
+              <button disabled title="Disponível no final da beta" style={{ width: '100%', padding: 13, borderRadius: 12, background: 'rgba(123,127,255,.1)', color: '#7b7fff', border: '1px solid rgba(123,127,255,.25)', fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'not-allowed', opacity: .85 }}>
+                🔒 Disponível após a beta
+              </button>
+            ) : (
+              <button onClick={() => onSubscribe && onSubscribe('max')} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'rgba(123,127,255,.15)', color: '#7b7fff', border: '1px solid rgba(123,127,255,.3)', fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>
+                Assinar Flow Max
+              </button>
+            )}
           </div>
         </div>
       </div>

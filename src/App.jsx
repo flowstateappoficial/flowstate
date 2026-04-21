@@ -45,6 +45,7 @@ import TrialOfferModal from './components/TrialOfferModal';
 import CancelTrialModal from './components/CancelTrialModal';
 import { startTrial as startTrialUtil, effectivePlan, getTrialStatus, markConverted, markNotified, cancelTrial as cancelTrialUtil, reactivateTrial as reactivateTrialUtil, processExpiry, getChargeDate } from './utils/trial';
 import { startCheckout, syncSubscription, pollSubscriptionUntilActive } from './utils/subscription';
+import useBetaStatus from './hooks/useBetaStatus';
 
 export default function App() {
   // ── RESPONSIVE ──
@@ -129,9 +130,20 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trialTick]);
 
+  // ── BETA STATUS ──
+  // Subscriptions are locked while the closed beta is running — users must
+  // wait for fs_end_beta() so that fs_redeem_beta_rewards can apply their
+  // earned Plus months. The PricingPage also hides the buttons, but we
+  // defend here too in case a stale click leaks through.
+  const { isBetaActive } = useBetaStatus();
+
   // Start trial via Stripe Checkout (card upfront, 7-day trial, then auto-bills).
   // Falls back to local-only trial if Stripe isn't configured yet (dev mode).
   const startTrial = useCallback(async () => {
+    if (isBetaActive) {
+      alert('A subscrição Plus fica disponível assim que a beta fechada terminar. Os teus meses Plus acumulados serão aplicados automaticamente no primeiro checkout.');
+      return;
+    }
     try {
       await startCheckout({ plan: 'plus', interval: 'month', withTrial: true });
       // redirects away; function never returns on success
@@ -140,17 +152,21 @@ export default function App() {
       startTrialUtil('plus', 7);
       bumpTrial();
     }
-  }, [bumpTrial]);
+  }, [bumpTrial, isBetaActive]);
 
   // Subscribe without trial (user already used trial or explicitly wants to pay now).
   const subscribeViaStripe = useCallback(async (plan = 'plus', interval = 'month') => {
+    if (isBetaActive) {
+      alert('A subscrição fica disponível assim que a beta fechada terminar. Os teus meses Plus acumulados serão aplicados automaticamente no primeiro checkout.');
+      return;
+    }
     try {
       await startCheckout({ plan, interval, withTrial: false });
     } catch (e) {
       console.warn('Stripe checkout unavailable:', e?.message || e);
       alert('Pagamentos temporariamente indisponíveis. Tenta novamente em instantes.');
     }
-  }, []);
+  }, [isBetaActive]);
 
   // ── TRIAL: listen for changes + re-eval every hour for daysLeft ──
   useEffect(() => {

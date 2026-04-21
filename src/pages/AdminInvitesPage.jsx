@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getSupabaseClient } from '../utils/supabase';
 import useIsMobile from '../hooks/useIsMobile';
+import { invalidateBetaStatusCache } from '../hooks/useBetaStatus';
 
 const ADMIN_EMAILS = ['flowstate.app.oficial@gmail.com'];
 
@@ -103,6 +104,8 @@ export default function AdminInvitesPage({ userEmail }) {
         // Recarrega estado
         setBetaEndedAt(data?.ended_at || new Date().toISOString());
         setBetaStats(null);
+        // Notifica o resto da app para reabrir as subscrições no PricingPage.
+        invalidateBetaStatusCache();
       }
     } catch (e) {
       setEndBetaResult({ ok: false, message: String(e?.message || e) });
