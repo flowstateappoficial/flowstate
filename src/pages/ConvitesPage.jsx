@@ -106,7 +106,7 @@ export default function ConvitesPage({ referralData, onSendInvite }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
             <div style={{ fontSize: 20 }}>🏦</div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Poupa-te no launch</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Acumula para o launch</div>
               <div style={{ fontSize: 11, color: '#8892b0', marginTop: 2 }}>
                 Recompensas acumuladas — entregues quando o Flowstate sair da beta
               </div>
