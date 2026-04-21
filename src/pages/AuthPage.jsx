@@ -14,6 +14,9 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
   const [legalOpen, setLegalOpen] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Ecrã dedicado pós-registo a pedir para verificar o email
+  // (em vez de mostrar mensagem vermelha no formulário).
+  const [pendingEmailVerification, setPendingEmailVerification] = useState(null);
 
   // Captura convite da URL (/convite/:code) se existir no localStorage.
   React.useEffect(() => {
@@ -73,7 +76,13 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
         result = await sb.auth.signInWithPassword({ email, password: pass });
       }
       if (result.error) { setError(result.error.message); setLoading(false); return; }
-      if (mode === 'register' && !result.data?.session) { setError('Confirma o teu email para ativar a conta.'); setLoading(false); return; }
+      if (mode === 'register' && !result.data?.session) {
+        // Signup OK mas email ainda por confirmar. Mostra ecrã dedicado
+        // em vez de mensagem de erro (mais friendly).
+        setPendingEmailVerification(email);
+        setLoading(false);
+        return;
+      }
 
       // ── Pós-registo: consumir beta_invite OU aplicar referral ──
       if (mode === 'register' && inviteCode.trim()) {
@@ -109,6 +118,64 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
   const handleBypass = () => {
     onEnterApp({ email: 'demo@flowstate.app', name: 'Demo' });
   };
+
+  const handleResendEmail = async () => {
+    const sb = getSupabaseClient();
+    if (!sb || !pendingEmailVerification) return;
+    try {
+      await sb.auth.resend({ type: 'signup', email: pendingEmailVerification });
+    } catch {}
+  };
+
+  // ── ECRÃ DEDICADO: verificação de email pós-registo ──
+  if (pendingEmailVerification) {
+    return (
+      <div id="page-auth-verify" style={{ minHeight: '100vh', background: '#141829', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '1rem' : '2rem', fontFamily: 'Inter,system-ui,sans-serif' }}>
+        <div style={{ marginBottom: '0.3rem', textAlign: 'center' }}>
+          <img src={logo} alt="Flowstate" style={{ height: isMobile ? 140 : 200, width: 'auto', display: 'block', margin: '0 auto' }} />
+        </div>
+        <div style={{ width: '100%', maxWidth: 440, background: '#202638', borderRadius: 20, padding: isMobile ? '2rem 1.5rem' : '2.5rem 2rem', boxShadow: '0 24px 64px rgba(0,0,0,.5)', textAlign: 'center' }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: '50%',
+            background: 'rgba(0,215,100,.1)',
+            border: '1px solid rgba(0,215,100,.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 32, margin: '0 auto 1.5rem',
+          }}>📬</div>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 .75rem', letterSpacing: '-.01em' }}>
+            Confirma o teu e-mail
+          </h2>
+          <p style={{ fontSize: 14, color: '#b8bfda', lineHeight: 1.6, margin: '0 0 .5rem' }}>
+            Enviámos um link de verificação para
+          </p>
+          <p style={{ fontSize: 15, color: '#00D764', fontWeight: 700, margin: '0 0 1.5rem', wordBreak: 'break-all' }}>
+            {pendingEmailVerification}
+          </p>
+          <div style={{
+            padding: '14px 16px', borderRadius: 12,
+            background: 'rgba(0,215,100,.06)',
+            border: '1px solid rgba(0,215,100,.15)',
+            marginBottom: '1.5rem', textAlign: 'left',
+          }}>
+            <div style={{ fontSize: 12, color: '#b8bfda', lineHeight: 1.6 }}>
+              <strong style={{ color: '#fff' }}>Próximo passo:</strong> abre o e-mail e carrega no link para ativar a conta. Podes fechar esta janela — quando voltares, faz login normalmente.
+            </div>
+          </div>
+          <p style={{ fontSize: 12, color: '#6e7491', lineHeight: 1.6, margin: '0 0 1.25rem' }}>
+            Não chegou? Verifica a pasta de spam ou{' '}
+            <button onClick={handleResendEmail}
+              style={{ background: 'none', border: 'none', color: '#00D764', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter,sans-serif', padding: 0, textDecoration: 'underline' }}>
+              reenviar agora
+            </button>.
+          </p>
+          <button onClick={() => { setPendingEmailVerification(null); setMode('login'); setError(''); setPass(''); }}
+            style={{ width: '100%', padding: 13, borderRadius: 12, background: 'rgba(255,255,255,.06)', color: '#fff', border: '1px solid rgba(255,255,255,.1)', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>
+            Voltar ao login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div id="page-auth" style={{ minHeight: '100vh', background: '#141829', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '1rem' : '2rem', fontFamily: 'Inter,system-ui,sans-serif' }}>
