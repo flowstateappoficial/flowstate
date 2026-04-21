@@ -291,7 +291,7 @@ input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.3);}
 /* ── MOBILE (≤768px) ── */
 @media(max-width:768px){
   /* Compact top bar: just logo + bell + avatar. Tabs are in BottomNav. */
-  nav.navbar{min-height:72px;padding:0 14px;position:sticky;top:0;}
+  nav.navbar{min-height:72px;padding:env(safe-area-inset-top, 0px) 14px 0;position:sticky;top:0;}
   .nav-logo img{height:68px!important;}
   .nav-tabs{display:none;}
   /* Reduce page chrome + leave room for the fixed bottom bar (~62px + safe area). */

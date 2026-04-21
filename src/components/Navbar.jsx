@@ -58,7 +58,10 @@ export default function Navbar({ logo, activeTab, onSwitchTab, userPlan, userEma
 
   return (
     <nav className="navbar" style={isMobile ? {
-      minHeight: 72, padding: '0 14px', gap: 10,
+      minHeight: 72,
+      // Respect iOS notch / Dynamic Island / status bar safe area.
+      padding: 'env(safe-area-inset-top, 0px) 14px 0',
+      gap: 10,
     } : undefined}>
       <div className="nav-logo" style={isMobile ? { height: 'auto' } : undefined}>
         <img
