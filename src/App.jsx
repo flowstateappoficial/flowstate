@@ -280,9 +280,12 @@ export default function App() {
 
   // ── CLEAR ALL USER DATA (localStorage + state) ──
   const clearAllUserData = useCallback(() => {
+    // NOTA: LS_ONBOARDED e fs_tour_done ficaram per-user (ver linhas abaixo)
+    // e por isso já não precisam de ser limpos aqui — cada user tem a sua
+    // própria flag, que deve persistir entre logins.
     const keysToRemove = [
       LS_TXS, LS_OBJ, LS_ATIVOS, LS_FE, LS_RULES, LS_PLAN,
-      LS_ONBOARDED, LS_BUDGET, LS_RENDIMENTO,
+      LS_BUDGET, LS_RENDIMENTO,
       'fs_dash_prefs_v1', 'fs_inv_entries_v1',
       'fs_streak_v1', 'fs_badges_v1',
       'fs_notifications_v1', 'fs_notifications_read_v1',
@@ -403,8 +406,23 @@ export default function App() {
       setInvDataLoaded(true);
     });
 
-    // Check onboarding
-    if (!localStorage.getItem(LS_ONBOARDED)) {
+    // Check onboarding — per user, para que switching entre contas não
+    // reabra o tour (LS_ONBOARDED global era limpo em cada logout).
+    const onboardKey = `${LS_ONBOARDED}_${currentUser.id}`;
+    const tourKey = `fs_tour_done_${currentUser.id}`;
+    // Migração: se existia a flag antiga global e ainda não temos a do user,
+    // copia para a chave per-user e apaga a antiga (evita mostrar o tour a
+    // quem já o fez antes desta alteração).
+    if (!localStorage.getItem(onboardKey) && localStorage.getItem(LS_ONBOARDED)) {
+      try {
+        localStorage.setItem(onboardKey, localStorage.getItem(LS_ONBOARDED));
+        const oldTour = localStorage.getItem('fs_tour_done');
+        if (oldTour && !localStorage.getItem(tourKey)) localStorage.setItem(tourKey, oldTour);
+        localStorage.removeItem(LS_ONBOARDED);
+        localStorage.removeItem('fs_tour_done');
+      } catch {}
+    }
+    if (!localStorage.getItem(onboardKey)) {
       setTimeout(() => setOnboardingOpen(true), 600);
     }
   }, [viewMode, currentUser]);
@@ -858,7 +876,9 @@ export default function App() {
           rendimentoMensal={rendimentoMensal}
           onFinish={async (newBudget, newRendimento) => {
             await saveBudgetLocal(newBudget, newRendimento);
-            localStorage.setItem(LS_ONBOARDED, '1');
+            if (currentUser?.id) {
+              localStorage.setItem(`${LS_ONBOARDED}_${currentUser.id}`, '1');
+            }
             setOnboardingOpen(false);
             // Start the interactive app tour
             setTimeout(() => setTourOpen(true), 400);
@@ -871,7 +891,9 @@ export default function App() {
         <AppTour
           onFinish={() => {
             setTourOpen(false);
-            localStorage.setItem('fs_tour_done', '1');
+            if (currentUser?.id) {
+              localStorage.setItem(`fs_tour_done_${currentUser.id}`, '1');
+            }
           }}
           onSwitchTab={(id) => { setActiveTab(id); window.scrollTo(0, 0); }}
           isMobile={isMobile}
