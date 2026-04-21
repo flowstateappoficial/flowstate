@@ -89,6 +89,10 @@ Deno.serve(async (req) => {
     // as recompensas intactas para um futuro downgrade/resubscribe em Plus.
     let trialDays = withTrial ? 7 : 0;
     const discounts: Array<{ coupon: string }> = [];
+    // Guardamos os ids/coupons para poder fazer rollback caso a criação do
+    // checkout falhe a seguir — o user não pode perder recompensas.
+    let redeemedIdsForRollback: string[] = [];
+    let couponIdForRollback: string | null = null;
 
     if (plan === 'plus') {
       const { data: redeemData, error: redeemErr } = await supa.rpc('fs_redeem_beta_rewards', {
@@ -101,6 +105,7 @@ Deno.serve(async (req) => {
         const plusMonths = redeemData.plus_months ?? 0;
         const extraTrialDays = redeemData.trial_days ?? 0;
         const redeemedIds: string[] = redeemData.redeemed_ids ?? [];
+        redeemedIdsForRollback = redeemedIds;
 
         if (extraTrialDays > 0) {
           trialDays = trialDays + extraTrialDays;
@@ -121,6 +126,7 @@ Deno.serve(async (req) => {
               },
             });
             discounts.push({ coupon: coupon.id });
+            couponIdForRollback = coupon.id;
           } catch (e) {
             // Rollback do redeem se o coupon falhar — user não perde recompensas.
             console.error('stripe.coupons.create failed:', e);
@@ -130,29 +136,47 @@ Deno.serve(async (req) => {
                 .update({ redeemed_at: null })
                 .in('id', redeemedIds);
             }
+            redeemedIdsForRollback = [];
           }
         }
       }
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      customer: customerId,
-      line_items: [{ price: priceId, quantity: 1 }],
-      subscription_data: {
-        trial_period_days: trialDays > 0 ? trialDays : undefined,
-        metadata: { user_id: user.id, plan },
-      },
-      payment_method_collection: 'always',
-      // Quando temos um coupon pre-aplicado, Stripe não permite promotion codes ao mesmo tempo.
-      allow_promotion_codes: discounts.length === 0,
-      discounts: discounts.length > 0 ? discounts : undefined,
-      success_url: `${APP_URL}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url:  `${APP_URL}/?checkout=cancel`,
-      locale: 'pt',
-    });
+    try {
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        customer: customerId,
+        line_items: [{ price: priceId, quantity: 1 }],
+        subscription_data: {
+          trial_period_days: trialDays > 0 ? trialDays : undefined,
+          metadata: { user_id: user.id, plan },
+        },
+        payment_method_collection: 'always',
+        // Stripe proíbe ambos em simultâneo. Se temos coupon pré-aplicado omitimos
+        // allow_promotion_codes por completo; caso contrário abrimos para promo codes.
+        ...(discounts.length > 0
+          ? { discounts }
+          : { allow_promotion_codes: true }),
+        success_url: `${APP_URL}/?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url:  `${APP_URL}/?checkout=cancel`,
+        locale: 'pt',
+      });
 
-    return json({ url: session.url });
+      return json({ url: session.url });
+    } catch (e) {
+      // Rollback em caso de falha a criar a session: devolver recompensas e apagar o coupon.
+      console.error('stripe.checkout.sessions.create failed:', e);
+      if (redeemedIdsForRollback.length > 0) {
+        await supa
+          .from('fs_pending_rewards')
+          .update({ redeemed_at: null })
+          .in('id', redeemedIdsForRollback);
+      }
+      if (couponIdForRollback) {
+        try { await stripe.coupons.del(couponIdForRollback); } catch {}
+      }
+      throw e;
+    }
   } catch (e) {
     console.error('create-checkout-session error', e);
     return json({ error: 'server_error', message: String(e?.message ?? e) }, 500);
