@@ -492,10 +492,14 @@ export default function App() {
       setInvDataLoaded(true);
     });
 
-    // Check onboarding — per user, para que switching entre contas não
-    // reabra o tour (LS_ONBOARDED global era limpo em cada logout).
+    // Check onboarding — source of truth: Supabase user_metadata.
+    // Fallback para localStorage (legado + offline). Persistir no Supabase
+    // garante que o tour não reaparece entre dispositivos / browsers / PWAs.
     const onboardKey = `${LS_ONBOARDED}_${currentUser.id}`;
     const tourKey = `fs_tour_done_${currentUser.id}`;
+    const metaOnboardedAt = currentUser.user_metadata?.fs_onboarded_at;
+    const metaTourDoneAt = currentUser.user_metadata?.fs_tour_done_at;
+
     // Migração: se existia a flag antiga global e ainda não temos a do user,
     // copia para a chave per-user e apaga a antiga (evita mostrar o tour a
     // quem já o fez antes desta alteração).
@@ -508,7 +512,33 @@ export default function App() {
         localStorage.removeItem('fs_tour_done');
       } catch {}
     }
-    if (!localStorage.getItem(onboardKey)) {
+
+    // Hidratar localStorage a partir do user_metadata (caso o user tenha
+    // completado o onboarding noutro dispositivo).
+    if (metaOnboardedAt && !localStorage.getItem(onboardKey)) {
+      try { localStorage.setItem(onboardKey, metaOnboardedAt); } catch {}
+    }
+    if (metaTourDoneAt && !localStorage.getItem(tourKey)) {
+      try { localStorage.setItem(tourKey, metaTourDoneAt); } catch {}
+    }
+
+    // Espelhar localStorage → user_metadata (utilizadores que completaram
+    // o tour antes desta alteração, ou que o fizeram offline).
+    const sb = getSupabaseClient();
+    if (sb) {
+      const localOnboard = localStorage.getItem(onboardKey);
+      const localTour = localStorage.getItem(tourKey);
+      const metaUpdates = {};
+      if (localOnboard && !metaOnboardedAt) metaUpdates.fs_onboarded_at = new Date().toISOString();
+      if (localTour && !metaTourDoneAt) metaUpdates.fs_tour_done_at = new Date().toISOString();
+      if (Object.keys(metaUpdates).length > 0) {
+        sb.auth.updateUser({ data: metaUpdates }).catch(() => {});
+      }
+    }
+
+    // Só abrir o overlay se NENHUMA das fontes (metadata OU localStorage)
+    // indicar que o user já o viu.
+    if (!metaOnboardedAt && !localStorage.getItem(onboardKey)) {
       setTimeout(() => setOnboardingOpen(true), 600);
     }
   }, [viewMode, currentUser]);
@@ -962,8 +992,14 @@ export default function App() {
           rendimentoMensal={rendimentoMensal}
           onFinish={async (newBudget, newRendimento) => {
             await saveBudgetLocal(newBudget, newRendimento);
+            const nowIso = new Date().toISOString();
             if (currentUser?.id) {
-              localStorage.setItem(`${LS_ONBOARDED}_${currentUser.id}`, '1');
+              localStorage.setItem(`${LS_ONBOARDED}_${currentUser.id}`, nowIso);
+              // Persistir no Supabase para sobreviver entre dispositivos.
+              try {
+                const sb = getSupabaseClient();
+                sb && sb.auth.updateUser({ data: { fs_onboarded_at: nowIso } }).catch(() => {});
+              } catch {}
             }
             setOnboardingOpen(false);
             // Start the interactive app tour
@@ -977,8 +1013,13 @@ export default function App() {
         <AppTour
           onFinish={() => {
             setTourOpen(false);
+            const nowIso = new Date().toISOString();
             if (currentUser?.id) {
-              localStorage.setItem(`fs_tour_done_${currentUser.id}`, '1');
+              localStorage.setItem(`fs_tour_done_${currentUser.id}`, nowIso);
+              try {
+                const sb = getSupabaseClient();
+                sb && sb.auth.updateUser({ data: { fs_tour_done_at: nowIso } }).catch(() => {});
+              } catch {}
             }
           }}
           onSwitchTab={(id) => { setActiveTab(id); window.scrollTo(0, 0); }}
