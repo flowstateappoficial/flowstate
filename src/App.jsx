@@ -83,6 +83,9 @@ export default function App() {
   const [ativoModalOpen, setAtivoModalOpen] = useState(false);
   const [ativoEditId, setAtivoEditId] = useState(null);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
+  // Quando true, o OnboardingOverlay abre em modo "edit only" — arranca no passo
+  // de rendimento+orçamento, botão final é "Guardar", e não dispara o tour.
+  const [onboardingEditMode, setOnboardingEditMode] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [paywallTab, setPaywallTab] = useState('');
   const [legalOpen, setLegalOpen] = useState(null);
@@ -813,7 +816,7 @@ export default function App() {
             onAddGoal={() => { setGoalEditId(null); setGoalModalOpen(true); }}
             onDeleteGoal={deleteGoal}
             onReforcoMeta={reforcoMeta}
-            onOpenBudget={() => setOnboardingOpen(true)}
+            onOpenBudget={() => { setOnboardingEditMode(true); setOnboardingOpen(true); }}
             fmtV={fmtV}
             fmtDate={fmtDate}
             getCurrentMonth={getCurrentMonth}
@@ -1001,22 +1004,27 @@ export default function App() {
         <OnboardingOverlay
           budget={budget}
           rendimentoMensal={rendimentoMensal}
+          editOnly={onboardingEditMode}
           onFinish={async (newBudget, newRendimento) => {
             await saveBudgetLocal(newBudget, newRendimento);
-            const nowIso = new Date().toISOString();
-            if (currentUser?.id) {
+            const wasEditMode = onboardingEditMode;
+            if (!wasEditMode && currentUser?.id) {
+              // Só marca fs_onboarded_at na primeira passagem (onboarding completo).
+              const nowIso = new Date().toISOString();
               localStorage.setItem(`${LS_ONBOARDED}_${currentUser.id}`, nowIso);
-              // Persistir no Supabase para sobreviver entre dispositivos.
               try {
                 const sb = getSupabaseClient();
                 sb && sb.auth.updateUser({ data: { fs_onboarded_at: nowIso } }).catch(() => {});
               } catch {}
             }
             setOnboardingOpen(false);
-            // Start the interactive app tour
-            setTimeout(() => setTourOpen(true), 400);
+            setOnboardingEditMode(false);
+            // Só dispara o tour interactivo no onboarding inicial, não quando o user só veio editar orçamento.
+            if (!wasEditMode) {
+              setTimeout(() => setTourOpen(true), 400);
+            }
           }}
-          onClose={() => setOnboardingOpen(false)}
+          onClose={() => { setOnboardingOpen(false); setOnboardingEditMode(false); }}
         />
       )}
 

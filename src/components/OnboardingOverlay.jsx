@@ -44,8 +44,19 @@ const TOTAL_WELCOME = WELCOME_SLIDES.length;
 const SETUP_COUNT = 3; // goal + income + budget
 const TOTAL_STEPS = TOTAL_WELCOME + SETUP_COUNT + 1; // +1 for celebration
 
-export default function OnboardingOverlay({ budget: initialBudget, rendimentoMensal: initialRendimento, onFinish, onClose }) {
-  const [step, setStep] = useState(0);
+export default function OnboardingOverlay({
+  budget: initialBudget,
+  rendimentoMensal: initialRendimento,
+  onFinish,
+  onClose,
+  // editOnly=true arranca direto no passo de rendimento e termina no orçamento
+  // com botão "Guardar" — usado pelo botão ⚙️ Gerir para editar valores sem
+  // voltar a fazer o tour completo.
+  editOnly = false,
+}) {
+  // Em modo edit, arrancamos no incomeStep (= TOTAL_WELCOME + 1).
+  const initialStep = editOnly ? TOTAL_WELCOME + 1 : 0;
+  const [step, setStep] = useState(initialStep);
   const [goal, setGoal] = useState(null);
   const [rendimento, setRendimento] = useState(initialRendimento || 0);
   const [localBudget, setLocalBudget] = useState({ ...initialBudget });
@@ -184,7 +195,7 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
         )}
 
         {/* ── SETUP STEPS HEADER ── */}
-        {isSetup && (
+        {isSetup && !editOnly && (
           <>
             <div style={{ display: 'flex', gap: 6, marginBottom: '2rem' }}>
               {[1, 2, 3].map(s => (
@@ -195,6 +206,19 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
               Passo {setupStep} de 3
             </div>
           </>
+        )}
+
+        {/* Header em modo edit — título + botão de fechar em X */}
+        {editOnly && isSetup && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#4a4e6a', textTransform: 'uppercase', letterSpacing: '.1em' }}>
+              Editar orçamento
+            </div>
+            <button onClick={onClose} aria-label="Fechar"
+              style={{ background: 'rgba(255,255,255,.06)', border: 'none', borderRadius: 8, width: 28, height: 28, color: '#8b8fa8', fontSize: 14, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>
+              ✕
+            </button>
+          </div>
         )}
 
         {/* Step: Goal */}
@@ -259,7 +283,11 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
               ))}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => goStep(goalStep)} style={{ flex: 1, padding: 13, borderRadius: 12, background: 'rgba(255,255,255,.07)', color: '#6e7491', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>← Voltar</button>
+              <button
+                onClick={() => editOnly ? onClose() : goStep(goalStep)}
+                style={{ flex: 1, padding: 13, borderRadius: 12, background: 'rgba(255,255,255,.07)', color: '#6e7491', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>
+                {editOnly ? 'Cancelar' : '← Voltar'}
+              </button>
               <button onClick={() => goStep(budgetStep)} style={{ flex: 2, padding: 13, borderRadius: 12, background: '#00D764', color: '#000', border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>Continuar →</button>
             </div>
           </div>
@@ -294,7 +322,11 @@ export default function OnboardingOverlay({ budget: initialBudget, rendimentoMen
             )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => goStep(incomeStep)} style={{ flex: 1, padding: 13, borderRadius: 12, background: 'rgba(255,255,255,.07)', color: '#6e7491', border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>← Voltar</button>
-              <button onClick={() => goStep(celebrationStep)} style={{ flex: 2, padding: 13, borderRadius: 12, background: '#00D764', color: '#000', border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>Continuar →</button>
+              <button
+                onClick={() => editOnly ? onFinish(localBudget, rendimento) : goStep(celebrationStep)}
+                style={{ flex: 2, padding: 13, borderRadius: 12, background: '#00D764', color: '#000', border: 'none', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>
+                {editOnly ? 'Guardar' : 'Continuar →'}
+              </button>
             </div>
           </div>
         )}
