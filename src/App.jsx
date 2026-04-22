@@ -711,9 +711,10 @@ export default function App() {
   }, [objetivos, saveGoal]);
 
   // ── INVESTMENT HELPERS ──
+  // Returns FE entry for a given month. If no entry exists, carries forward the
+  // most recent prior entry (value + meta). Works for past, current AND future months —
+  // consumers (e.g. charts) decide separately whether to render future months.
   const getFeForMonth = useCallback((ym) => {
-    const curYM = getCurrentMonth();
-    if (ym > curYM) return { value: 0, meta: 0 };
     if (feEntries[ym]) return feEntries[ym];
     const meses = Object.keys(feEntries).sort();
     let ultimo = null;

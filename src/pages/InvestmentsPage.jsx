@@ -67,7 +67,13 @@ export default function InvestmentsPage({ ativos, ativoEntries, feEntries, invMo
     const months = [];
     for (let m = 1; m <= 12; m++) months.push(year + '-' + String(m).padStart(2, '0'));
     const labels = months.map(ym => PT_M[parseInt(ym.split('-')[1]) - 1]);
-    const data = months.map(ym => { const p = getPatrimonioForMonth(ym); return p > 0 ? p : null; });
+    const curYM = getCurrentMonth();
+    const data = months.map(ym => {
+      // Não projectar património em meses futuros — o gráfico mostra só até ao mês actual
+      if (ym > curYM) return null;
+      const p = getPatrimonioForMonth(ym);
+      return p > 0 ? p : null;
+    });
     const ctx = patrimonioRef.current.getContext('2d');
     const grad = ctx.createLinearGradient(0, 0, 0, 200);
     grad.addColorStop(0, 'rgba(0,215,100,0.3)'); grad.addColorStop(1, 'rgba(0,215,100,0.02)');
