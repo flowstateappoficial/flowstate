@@ -107,7 +107,7 @@ export default function App() {
   const [referralModalOpen, setReferralModalOpen] = useState(false);
 
   // ── DASHBOARD PREFS ──
-  const [dashPrefs, setDashPrefs] = useState({ visible: ['hero','performance','budget','goals','mainGoal','subscriptions','gamification'] });
+  const [dashPrefs, setDashPrefs] = useState({ visible: ['hero','performance','budget','goals','subscriptions','gamification'] });
 
   // ── WRAPPED ──
   const [wrappedSlides, setWrappedSlides] = useState(null);
@@ -315,7 +315,7 @@ export default function App() {
     keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch {} });
     setTxs([]); setObjetivos([]); setAtivos([]); setAtivoEntries({}); setFeEntries({});
     setBudget({}); setRendimentoMensal(0); setUserRules([]);
-    setDashPrefs({ visible: ['hero','performance','budget','goals','mainGoal','subscriptions','gamification'] });
+    setDashPrefs({ visible: ['hero','performance','budget','goals','subscriptions','gamification'] });
     setStreak({ current: 0, best: 0, lastDate: null }); setBadges([]);
     setNotifications([]); setReadIds([]);
     setReferralData(null);
@@ -639,9 +639,8 @@ export default function App() {
     console.log('[saveGoal] Chamado com:', obj);
     console.log('[saveGoal] objetivos atuais:', objetivos);
 
-    // 1) Cópia dos objetivos atuais; se é principal, reset dos outros
+    // 1) Cópia dos objetivos atuais
     let newObjetivos = [...objetivos];
-    if (obj.isMain) newObjetivos = newObjetivos.map(o => ({ ...o, isMain: false }));
 
     // 2) Tenta guardar na Supabase
     let saved = null;
@@ -662,7 +661,6 @@ export default function App() {
       atual: typeof obj.atual === 'number' ? obj.atual : parseFloat(obj.atual) || 0,
       meta: typeof obj.meta === 'number' ? obj.meta : parseFloat(obj.meta) || 0,
       cor: obj.cor || '#00D764',
-      isMain: !!obj.isMain,
     };
     console.log('[saveGoal] finalObj:', finalObj);
 
@@ -700,15 +698,6 @@ export default function App() {
     saveObjetivosLocal(newObj);
     if (currentUser) deleteGoalFromSupabase(id, currentUser.id);
   }, [objetivos, currentUser, saveObjetivosLocal]);
-
-  const reforcoMeta = useCallback(async () => {
-    const main = objetivos.find(o => o.isMain) || (objetivos.length > 0 ? objetivos[0] : null);
-    if (!main) { setGoalEditId(null); setGoalModalOpen(true); return; }
-    const val = parseFloat(prompt(`Quanto queres adicionar ao objetivo "${main.nome}"?\nAtual: ${main.atual.toLocaleString('pt-PT')} € | Meta: ${main.meta.toLocaleString('pt-PT')} €`));
-    if (!val || isNaN(val) || val <= 0) return;
-    const updated = { ...main, atual: Math.min(main.meta, main.atual + val) };
-    await saveGoal(updated);
-  }, [objetivos, saveGoal]);
 
   // ── INVESTMENT HELPERS ──
   // Returns FE entry for a given month. If no entry exists, carries forward the
@@ -816,7 +805,6 @@ export default function App() {
             onEditGoal={(id) => { setGoalEditId(id); setGoalModalOpen(true); }}
             onAddGoal={() => { setGoalEditId(null); setGoalModalOpen(true); }}
             onDeleteGoal={deleteGoal}
-            onReforcoMeta={reforcoMeta}
             onOpenBudget={() => { setOnboardingEditMode(true); setOnboardingOpen(true); }}
             fmtV={fmtV}
             fmtDate={fmtDate}

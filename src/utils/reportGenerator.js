@@ -33,7 +33,7 @@ export function generateMonthlyReport({ txs, objetivos, ativos, feEntries, budge
   curTxs.filter(t => t.type === 'despesa').forEach(t => { catSpend[t.cat] = (catSpend[t.cat] || 0) + t.val; });
   const catSorted = Object.entries(catSpend).sort((a, b) => b[1] - a[1]);
 
-  const main = objetivos.find(o => o.isMain) || (objetivos.length > 0 ? objetivos[0] : null);
+  const topGoals = (objetivos || []).slice(0, 3);
   const subs = detectSubscriptions(txs);
   const topExpenses = curTxs.filter(t => t.type === 'despesa').sort((a, b) => b.val - a.val).slice(0, 5);
 
@@ -42,8 +42,6 @@ export function generateMonthlyReport({ txs, objetivos, ativos, feEntries, budge
     'Lazer': '#f7931a', 'Saúde': '#ff6b9d', 'Investimento': '#06d6a0',
     'Poupança': '#06d6a0', 'Outro': '#6e7491'
   };
-
-  const goalPct = main && main.meta > 0 ? Math.min(100, Math.round((main.atual / main.meta) * 100)) : 0;
 
   const html = `<!DOCTYPE html>
 <html lang="pt">
@@ -337,22 +335,26 @@ body{
   </div>
 </div>
 
-<!-- OBJETIVO PRINCIPAL -->
-${main ? `
+<!-- OBJETIVOS DE POUPANÇA -->
+${topGoals.length > 0 ? `
 <div class="sec">
-  <div class="sec-title">Objetivo principal</div>
-  <div class="card" style="display:flex;align-items:center;gap:32px">
+  <div class="sec-title">Objetivos de poupança</div>
+  ${topGoals.map(g => {
+    const pct = g.meta > 0 ? Math.min(100, Math.round((g.atual / g.meta) * 100)) : 0;
+    return `
+  <div class="card" style="display:flex;align-items:center;gap:32px;margin-bottom:10px">
     <div style="flex:1">
-      <div class="goal-name">${main.nome}</div>
-      <div class="goal-sub">${main.meta > main.atual ? 'Faltam ' + fmtE(main.meta - main.atual) + ' para atingir a meta' : 'Meta atingida!'}</div>
-      <div class="goal-bar"><div class="goal-bar-fill" style="width:${goalPct}%;background:${main.cor || '#00D764'}"></div></div>
-      <div class="goal-vals"><span>${fmtE(main.atual)}</span><span>${fmtE(main.meta)}</span></div>
+      <div class="goal-name">${g.nome}</div>
+      <div class="goal-sub">${g.meta > g.atual ? 'Faltam ' + fmtE(g.meta - g.atual) + ' para atingir a meta' : 'Meta atingida!'}</div>
+      <div class="goal-bar"><div class="goal-bar-fill" style="width:${pct}%;background:${g.cor || '#00D764'}"></div></div>
+      <div class="goal-vals"><span>${fmtE(g.atual)}</span><span>${fmtE(g.meta)}</span></div>
     </div>
     <div style="text-align:center;min-width:90px">
-      <div class="goal-pct">${goalPct}%</div>
+      <div class="goal-pct">${pct}%</div>
       <div style="font-size:10px;color:#4a5072;margin-top:2px">concluído</div>
     </div>
-  </div>
+  </div>`;
+  }).join('')}
 </div>
 ` : ''}
 

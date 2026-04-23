@@ -7,19 +7,16 @@ export default function GoalModal({ editId, objetivos, onClose, onSave }) {
   const [atual, setAtual] = useState('');
   const [meta, setMeta] = useState('');
   const [cor, setCor] = useState('#00D764');
-  const [isMain, setIsMain] = useState(false);
 
   useEffect(() => {
     if (editId) {
       const o = objetivos.find(x => String(x.id) === String(editId));
       if (o) {
         setNome(o.nome); setAtual(o.atual); setMeta(o.meta);
-        setCor(o.cor || '#00D764'); setIsMain(!!o.isMain);
+        setCor(o.cor || '#00D764');
       }
     } else {
       setNome(''); setAtual(''); setMeta(''); setCor('#00D764');
-      // Auto-marcar como principal se não existir nenhum objetivo principal
-      setIsMain(!objetivos.some(o => o.isMain));
     }
   }, [editId, objetivos]);
 
@@ -31,7 +28,6 @@ export default function GoalModal({ editId, objetivos, onClose, onSave }) {
       atual: parseFloat(atual) || 0,
       meta: parseFloat(meta) || 0,
       cor,
-      isMain
     });
   };
 
@@ -63,13 +59,6 @@ export default function GoalModal({ editId, objetivos, onClose, onSave }) {
               }} />
             ))}
           </div>
-        </div>
-        <div className="form-field" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <input type="checkbox" checked={isMain} onChange={e => setIsMain(e.target.checked)}
-            style={{ width: 16, height: 16, accentColor: 'var(--accent)' }} />
-          <label style={{ textTransform: 'none', fontSize: 13, letterSpacing: 0, color: 'var(--t2)' }}>
-            Definir como objetivo principal
-          </label>
         </div>
         <div className="modal-actions">
           <button className="btn-add" onClick={handleSave}>Guardar</button>

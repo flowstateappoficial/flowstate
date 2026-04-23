@@ -58,7 +58,7 @@ export async function loadGoalsFromSupabase(userId) {
   try {
     const { data, error } = await sb.from('goals').select('*').eq('user_id', userId).order('created_at', { ascending: true });
     if (error) { console.warn('goals:', error.message); return null; }
-    return data.map(r => ({ id: r.id, nome: r.title, atual: parseFloat(r.current_amount) || 0, meta: parseFloat(r.target_amount) || 0, cor: r.color || '#00D764', isMain: !!r.is_main }));
+    return data.map(r => ({ id: r.id, nome: r.title, atual: parseFloat(r.current_amount) || 0, meta: parseFloat(r.target_amount) || 0, cor: r.color || '#00D764' }));
   } catch (e) { return null; }
 }
 
@@ -66,7 +66,7 @@ export async function saveGoalToSupabase(obj, userId) {
   const sb = getSupabaseClient();
   if (!sb || !userId) { console.warn('[GOAL] No sb or userId', { sb: !!sb, userId }); return null; }
   try {
-    const row = { user_id: userId, title: obj.nome, target_amount: obj.meta, current_amount: obj.atual, color: obj.cor, is_main: !!obj.isMain };
+    const row = { user_id: userId, title: obj.nome, target_amount: obj.meta, current_amount: obj.atual, color: obj.cor, is_main: false };
     const isExisting = obj.id != null && obj.id !== '' && !String(obj.id).startsWith('local_');
     console.log('[GOAL] saveGoalToSupabase', { obj, row, isExisting });
     let resultData = null;
@@ -80,12 +80,6 @@ export async function saveGoalToSupabase(obj, userId) {
       console.log('[GOAL] INSERT result:', { data, error: error?.message });
       if (error) { return null; }
       resultData = data;
-    }
-    if (obj.isMain && resultData?.id) {
-      try {
-        await sb.from('goals').update({ is_main: false }).eq('user_id', userId).neq('id', resultData.id);
-        console.log('[GOAL] Reset other is_main done');
-      } catch {}
     }
     console.log('[GOAL] Returning:', resultData);
     return resultData;

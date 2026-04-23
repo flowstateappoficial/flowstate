@@ -10,13 +10,13 @@ import ReportUpgradeOverlay from '../components/ReportUpgradeOverlay';
 import DashboardSettings from '../components/DashboardSettings';
 import { generateWrappedData } from '../utils/wrappedAnalysis';
 
-export default function DashboardPage({ txs, txsWithRules, objetivos, budget, rendimentoMensal, onOpenTxModal, onSwitchTab, onEditGoal, onAddGoal, onDeleteGoal, onReforcoMeta, onOpenBudget, fmtV, fmtDate, getCurrentMonth, streak, badges, newBadges, ativos, feEntries, userPlan, onViewPlans, dashPrefs, onUpdateDashPrefs, onOpenWrapped }) {
+export default function DashboardPage({ txs, txsWithRules, objetivos, budget, rendimentoMensal, onOpenTxModal, onSwitchTab, onEditGoal, onAddGoal, onDeleteGoal, onOpenBudget, fmtV, fmtDate, getCurrentMonth, streak, badges, newBadges, ativos, feEntries, userPlan, onViewPlans, dashPrefs, onUpdateDashPrefs, onOpenWrapped }) {
   const isMobile = useIsMobile();
   const [reportOverlay, setReportOverlay] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportPickerOpen, setReportPickerOpen] = useState(false);
 
-  const visible = dashPrefs?.visible || ['hero','performance','budget','goals','mainGoal','subscriptions','gamification'];
+  const visible = dashPrefs?.visible || ['hero','performance','budget','goals','subscriptions','gamification'];
   const show = (id) => visible.includes(id);
   const curYM = getCurrentMonth();
   const cur = useMemo(() => txsWithRules.filter(t => t.date.startsWith(curYM)), [txsWithRules, curYM]);
@@ -39,8 +39,6 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
   const incomeUp = incomeDiff !== null && incomeDiff >= 0;
 
   const sorted = [...cur].sort((a, b) => b.date.localeCompare(a.date));
-  const main = objetivos.find(o => o.isMain) || (objetivos.length > 0 ? objetivos[0] : null);
-  const secObjetivos = objetivos.filter(o => o !== main);
   const dica = getDicaDoDia();
 
   // Budget
@@ -321,13 +319,13 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
               + Novo objetivo
             </button>
           </div>
-          {secObjetivos.length === 0 ? (
+          {objetivos.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--t3)', fontSize: 13 }}>
               <div style={{ fontSize: '1.8rem', marginBottom: '.5rem' }}>🎯</div>
               <div style={{ fontWeight: 700, color: 'var(--t2)', marginBottom: '.35rem' }}>Sem objetivos.</div>
               Adiciona o teu primeiro!
             </div>
-          ) : secObjetivos.map(o => {
+          ) : objetivos.map(o => {
             const pct = Math.min(100, o.meta > 0 ? Math.round((o.atual / o.meta) * 100) : 0);
             return (
               <div className="obj-row" key={o.id}>
@@ -366,31 +364,6 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
               Partilhar
             </button>
           </div>
-        </div>
-      </div>}
-
-      {/* Main goal progress */}
-      {show('mainGoal') && <div className="prog-card">
-        <div className="prog-header">
-          <div className="prog-title-wrap">
-            <span>{main?.emoji || '🎯'}</span>
-            <span>{main?.nome || 'Objetivo Principal'}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--t3)' }}>{main ? 'Meta: ' + main.meta.toLocaleString('pt-PT') + ' €' : 'Sem meta definida'}</span>
-            <button className="edit-btn" onClick={() => {
-              if (main) onEditGoal(String(main.id));
-              else onAddGoal();
-            }}>✏️ Editar</button>
-            <button className="edit-btn" onClick={onReforcoMeta}>+ Reforço</button>
-          </div>
-        </div>
-        <div className="prog-bar-bg">
-          <div className="prog-bar-fill" style={{ width: main ? Math.min(100, Math.round((main.atual / main.meta) * 100)) + '%' : '0%' }} />
-        </div>
-        <div className="prog-labels">
-          <span>{main ? main.atual.toLocaleString('pt-PT') + ' € (' + Math.min(100, Math.round((main.atual / main.meta) * 100)) + '%)' : '0 € (0%)'}</span>
-          <span>{main ? main.meta.toLocaleString('pt-PT') + ' €' : '0 €'}</span>
         </div>
       </div>}
 
