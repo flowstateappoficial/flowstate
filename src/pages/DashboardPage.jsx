@@ -202,23 +202,35 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 20, color: saving ? 'var(--accent)' : 'var(--red-soft)' }}>{spendDiff !== null ? (saving ? '↓' : '↑') : '📊'}</span>
-              <span style={{ fontSize: 28, fontWeight: 800, color: saving ? 'var(--accent)' : 'var(--red-soft)' }}>
+              <span style={{ fontSize: 20, color: spendDiff === null ? 'var(--t3)' : saving ? 'var(--accent)' : 'var(--red-soft)' }}>{spendDiff !== null ? (saving ? '↓' : '↑') : '📊'}</span>
+              <span style={{ fontSize: 28, fontWeight: 800, color: spendDiff === null ? 'var(--t3)' : saving ? 'var(--accent)' : 'var(--red-soft)' }}>
                 {spendDiff !== null ? (spendDiff >= 0 ? '+' : '') + spendDiff + '%' : '—'}
               </span>
             </div>
             <div style={{ fontSize: 12, color: 'var(--t3)' }}>{spendDiff !== null ? (saving ? 'gastaste menos este mês' : 'gastaste mais este mês') : 'sem dados do mês anterior'}</div>
-            <div style={{ fontSize: 12, color: 'var(--t2)', marginTop: 8 }}>{saving ? '🏆 Boa gestão! Continua assim.' : '💪 Vamos controlar mais as despesas.'}</div>
+            <div style={{ fontSize: 12, color: 'var(--t2)', marginTop: 8 }}>
+              {spendDiff === null
+                ? 'Regista as primeiras despesas para ver a tendência.'
+                : saving
+                  ? '🏆 Boa gestão! Continua assim.'
+                  : '💪 Vamos controlar mais as despesas.'}
+            </div>
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 20, color: incomeUp ? 'var(--accent)' : 'var(--red-soft)' }}>{incomeDiff !== null ? (incomeUp ? '↑' : '↓') : '📊'}</span>
-              <span style={{ fontSize: 28, fontWeight: 800, color: incomeUp ? 'var(--accent)' : 'var(--red-soft)' }}>
+              <span style={{ fontSize: 20, color: incomeDiff === null ? 'var(--t3)' : incomeUp ? 'var(--accent)' : 'var(--red-soft)' }}>{incomeDiff !== null ? (incomeUp ? '↑' : '↓') : '📊'}</span>
+              <span style={{ fontSize: 28, fontWeight: 800, color: incomeDiff === null ? 'var(--t3)' : incomeUp ? 'var(--accent)' : 'var(--red-soft)' }}>
                 {incomeDiff !== null ? (incomeDiff >= 0 ? '+' : '') + incomeDiff + '%' : '—'}
               </span>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--t3)' }}>variação de rendimento vs mês passado</div>
-            <div style={{ fontSize: 12, color: 'var(--t2)', marginTop: 8 }}>{incomeUp ? 'receitas a crescer' : 'receitas em queda'}</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)' }}>{incomeDiff !== null ? 'variação de rendimento vs mês passado' : 'sem dados do mês anterior'}</div>
+            <div style={{ fontSize: 12, color: 'var(--t2)', marginTop: 8 }}>
+              {incomeDiff === null
+                ? 'Regista os primeiros rendimentos para ver a tendência.'
+                : incomeUp
+                  ? '📈 Receitas a crescer.'
+                  : '📉 Receitas em queda.'}
+            </div>
           </div>
         </div>
 
