@@ -23,7 +23,7 @@ html,body{min-height:100vh;background:var(--bg);}
 body{font-family:var(--font);color:var(--t1);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
 
 /* ── NAV (top navbar only; BottomNav on mobile is a separate <nav>) ── */
-nav.navbar{background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;min-height:160px;padding:0 2rem;position:sticky;top:0;z-index:200;width:100%;overflow:visible;}
+nav.navbar{background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;min-height:160px;padding:0 2rem;position:sticky;top:0;z-index:1000;width:100%;overflow:visible;}
 .nav-logo{display:flex;align-items:center;height:100%;}
 .nav-logo img{height:200px!important;max-height:none!important;width:auto!important;display:block!important;margin:auto 0!important;}
 .nav-tabs{display:flex;height:100%;margin-left:2.5rem;gap:40px;}
