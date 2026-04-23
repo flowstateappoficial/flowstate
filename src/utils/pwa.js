@@ -1,16 +1,42 @@
-// Registo do Service Worker + gestão do prompt de instalação (PWA).
-// O SW é registado em produção (build) ou quando o dev define VITE_ENABLE_SW=1.
+// Registo do Service Worker + gestao do prompt de instalacao (PWA).
+// O SW e registado em producao (build) ou quando o dev define VITE_ENABLE_SW=1.
+// O prompt de instalacao e capturado SEMPRE (independente do SW) para maximizar
+// as hipoteses de apanhar o evento beforeinstallprompt que o Chrome dispara
+// muito cedo no ciclo de vida da pagina.
 
 let deferredPrompt = null;
 const listeners = new Set();
+let initialised = false;
 
 function emit() {
   const state = { canInstall: !!deferredPrompt };
   listeners.forEach(fn => { try { fn(state); } catch {} });
 }
 
+// Inicializa os listeners do prompt imediatamente - tem que ser chamado o mais
+// cedo possivel (idealmente antes do React render) para nao perdermos o evento.
+export function initInstallPromptCapture() {
+  if (initialised || typeof window === 'undefined') return;
+  initialised = true;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    emit();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
+    emit();
+  });
+}
+
 export function registerSW() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+  // Garantir que o prompt e capturado mesmo se o chamador se esqueceu de
+  // chamar initInstallPromptCapture() antes.
+  initInstallPromptCapture();
 
   const isProd = import.meta.env.PROD;
   const devEnabled = import.meta.env.VITE_ENABLE_SW === '1';
@@ -18,7 +44,7 @@ export function registerSW() {
 
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then(reg => {
-      // Quando há nova versão a aguardar, ativa-a imediatamente.
+      // Quando ha nova versao a aguardar, ativa-a imediatamente.
       if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
       reg.addEventListener('updatefound', () => {
         const nw = reg.installing;
@@ -37,18 +63,6 @@ export function registerSW() {
       refreshed = true;
       window.location.reload();
     });
-  });
-
-  // Captura o evento que permite mostrar o prompt de instalação.
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    emit();
-  });
-
-  window.addEventListener('appinstalled', () => {
-    deferredPrompt = null;
-    emit();
   });
 }
 
