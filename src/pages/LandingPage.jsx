@@ -7,12 +7,12 @@ export default function LandingPage({ logo, onShowAuth }) {
   const [legalOpen, setLegalOpen] = useState(null);
   return (
     <div style={{
-      height: '100vh',
-      minHeight: isMobile ? 520 : 640,
+      minHeight: '100vh',
       background: '#141829',
       position: 'relative',
       overflowX: 'hidden',
-      overflowY: isMobile ? 'auto' : 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
       fontFamily: 'Inter, system-ui, sans-serif'
     }}>
 
@@ -73,15 +73,13 @@ export default function LandingPage({ logo, onShowAuth }) {
 
       {/* ── Devices — laptop + telemóvel (desktop) / só telemóvel (mobile) ── */}
       <div style={{
-        position: isMobile ? 'relative' : 'absolute',
-        bottom: isMobile ? 'auto' : '4rem',
-        left: 0,
-        right: 0,
+        position: 'relative',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         gap: isMobile ? 0 : 24,
-        padding: isMobile ? '1.5rem 1rem 2rem' : '0 2rem',
+        padding: isMobile ? '1.5rem 1rem 2rem' : '2rem 2rem 3rem',
+        marginTop: isMobile ? 0 : 'auto',
         zIndex: 5
       }}>
 
@@ -374,12 +372,9 @@ export default function LandingPage({ logo, onShowAuth }) {
 
       {/* ── Footer ── */}
       <div style={{
-        position: isMobile ? 'relative' : 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
+        position: 'relative',
         textAlign: 'center',
-        padding: isMobile ? '1rem .6rem 1.5rem' : '.6rem',
+        padding: isMobile ? '1rem .6rem 1.5rem' : '.6rem .6rem 1rem',
         fontSize: isMobile ? 10 : 11,
         color: '#6e7491',
         zIndex: 1
