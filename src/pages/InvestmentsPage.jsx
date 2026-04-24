@@ -86,7 +86,7 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
     const labels = months.map(ym => PT_M[parseInt(ym.split('-')[1]) - 1]);
     const curYM = getCurrentMonth();
     const data = months.map(ym => {
-      // Não projectar património em meses futuros — o gráfico mostra só até ao mês actual
+      // Não projectar património em meses futuros — o gráfico mostra só até ao mês atual
       if (ym > curYM) return null;
       const p = getPatrimonioForMonth(ym);
       return p > 0 ? p : null;
@@ -205,8 +205,8 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
 
     const base = ensureContribsBackfilled(ativId, ativoContribs[ativId]);
     const novaBaseContribs = { ...ativoContribs, [ativId]: base };
-    const contribActualMes = (base[invMonth] || 0) + valor;
-    await persistContribForMonth(ativId, invMonth, contribActualMes, novaBaseContribs);
+    const contribAtualMes = (base[invMonth] || 0) + valor;
+    await persistContribForMonth(ativId, invMonth, contribAtualMes, novaBaseContribs);
 
     if (currentUser && Object.keys(ativoContribs[ativId] || {}).length === 0) {
       const primeiro = Object.keys(base).find(m => m !== invMonth);
@@ -224,8 +224,8 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
 
     const base = ensureContribsBackfilled(ativId, ativoContribs[ativId]);
     const novaBaseContribs = { ...ativoContribs, [ativId]: base };
-    const contribActualMes = (base[invMonth] || 0) - valor;
-    await persistContribForMonth(ativId, invMonth, contribActualMes, novaBaseContribs);
+    const contribAtualMes = (base[invMonth] || 0) - valor;
+    await persistContribForMonth(ativId, invMonth, contribAtualMes, novaBaseContribs);
 
     if (currentUser && Object.keys(ativoContribs[ativId] || {}).length === 0) {
       const primeiro = Object.keys(base).find(m => m !== invMonth);
@@ -235,9 +235,9 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
     await persistEntryForMonth(ativId, invMonth, Math.max(0, atual - valor));
   };
 
-  const handleActualizarValorAtivo = async (ativId) => {
+  const handleAtualizarValorAtivo = async (ativId) => {
     const atual = getAtivoValueForMonth(ativId, invMonth);
-    const novoStr = prompt(`Qual o valor actual deste investimento segundo o broker? (€)\nValor registado: ${atual.toLocaleString('pt-PT')} €\n\nUsa este botão quando o mercado mexer. Para adicionar ou retirar dinheiro teu, usa os botões + Reforçar / − Retirar.`);
+    const novoStr = prompt(`Qual o valor atual deste investimento segundo o broker? (€)\nValor registado: ${atual.toLocaleString('pt-PT')} €\n\nUsa este botão quando o mercado mexer. Para adicionar ou retirar dinheiro teu, usa os botões + Reforçar / − Retirar.`);
     const novo = parseFloat(novoStr);
     if (novoStr === null || isNaN(novo) || novo < 0) return;
     await persistEntryForMonth(ativId, invMonth, novo);
@@ -453,7 +453,7 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
       <div style={{ background: 'rgba(0,215,100,.06)', border: '1px solid rgba(0,215,100,.15)', borderRadius: 12, padding: '.9rem 1.1rem', marginBottom: '1.25rem', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>💡</span>
         <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.65 }}>
-          <strong style={{ color: 'var(--t1)' }}>3 acções por ativo:</strong> <strong style={{ color: 'var(--accent)' }}>+ Reforçar</strong> quando metes dinheiro, <strong style={{ color: 'var(--red-soft)' }}>− Retirar</strong> quando tiras, <strong style={{ color: '#7b7fff' }}>💰 Valor actual</strong> quando o broker mostra um valor diferente (movimento do mercado).
+          <strong style={{ color: 'var(--t1)' }}>3 acções por ativo:</strong> <strong style={{ color: 'var(--accent)' }}>+ Reforçar</strong> quando metes dinheiro, <strong style={{ color: 'var(--red-soft)' }}>− Retirar</strong> quando tiras, <strong style={{ color: '#7b7fff' }}>💰 Valor atual</strong> quando o broker mostra um valor diferente (movimento do mercado).
         </div>
       </div>
 
@@ -519,7 +519,7 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr) minmax(0,1fr) auto', gap: 6, marginTop: 10 }}>
                   <button onClick={() => handleReforcarAtivo(a.id)} style={{ padding: 9, borderRadius: 8, background: 'var(--accent)', color: '#000', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>+ Reforçar</button>
                   <button onClick={() => handleRetirarAtivo(a.id)} style={{ padding: 9, borderRadius: 8, background: 'rgba(229,57,53,.15)', color: 'var(--red-soft)', border: '1px solid rgba(229,57,53,.25)', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>− Retirar</button>
-                  <button onClick={() => handleActualizarValorAtivo(a.id)} title="Actualizar o valor total segundo o broker (movimento do mercado)" style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(123,127,255,.12)', color: '#7b7fff', border: '1px solid rgba(123,127,255,.25)', fontFamily: 'var(--font)', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>💰 Valor actual</button>
+                  <button onClick={() => handleAtualizarValorAtivo(a.id)} title="Atualizar o valor total segundo o broker (movimento do mercado)" style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(123,127,255,.12)', color: '#7b7fff', border: '1px solid rgba(123,127,255,.25)', fontFamily: 'var(--font)', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>💰 Valor atual</button>
                 </div>
               </div>
             );

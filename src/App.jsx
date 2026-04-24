@@ -723,7 +723,7 @@ export default function App() {
 
   // Investido acumulado num ativo até ao mês ym (soma das contribuições líquidas).
   // Se ainda não há contribuições registadas mas existe valor de mercado, assume
-  // modo legacy: investido = valor actual (valorização = 0). Este fallback
+  // modo legacy: investido = valor atual (valorização = 0). Este fallback
   // evita mostrar rendimentos artificiais a utilizadores antigos até que façam
   // a primeira contribuição explícita.
   const getAtivoInvestidoForMonth = useCallback((id, ym) => {

@@ -40,7 +40,7 @@ export default function ConvitesPage({ referralData, onSendInvite, onLogShare })
     const text = encodeURIComponent(getShareText(code));
     window.open(`https://wa.me/?text=${text}`, '_blank');
     // Regista a partilha no backend para fazer bump ao contador `invites_sent`.
-    // Disparado "fire-and-forget"; o onLogShare refaz o fetch e actualiza UI.
+    // Disparado "fire-and-forget"; o onLogShare refaz o fetch e atualiza UI.
     if (onLogShare) onLogShare('whatsapp');
   };
 

@@ -1,34 +1,34 @@
 import React, { useState } from 'react';
 import useIsMobile from '../hooks/useIsMobile';
 
-// Overlay de formação — explica o modelo de investimentos (valor actual vs
+// Overlay de formação — explica o modelo de investimentos (valor atual vs
 // investido vs valorização) e os 3 botões (+ Reforçar, − Retirar, 💰 Valor
-// actual). Aparece automaticamente na primeira visita ao separador
+// atual). Aparece automaticamente na primeira visita ao separador
 // Investimentos e pode ser reaberto pelo botão "Como funciona?".
 
 const SLIDES = [
   {
     emoji: '📊',
-    titulo: 'Valor actual vs Investido',
-    texto: 'Separamos duas coisas que a maioria das apps mistura: quanto tu investiste com o teu dinheiro (Investido) e quanto o ativo vale hoje no mercado (Valor actual). A diferença entre os dois é a tua valorização real.',
+    titulo: 'Valor atual vs Investido',
+    texto: 'Separamos duas coisas que a maioria das apps mistura: quanto tu investiste com o teu dinheiro (Investido) e quanto o ativo vale hoje no mercado (Valor atual). A diferença entre os dois é a tua valorização real.',
     highlight: 'Ex: investiste 1.000 €, o ativo vale hoje 1.250 € → valorização +25% (+250 €).',
   },
   {
     emoji: '➕',
     titulo: 'Botão "+ Reforçar"',
-    texto: 'Usa quando metes dinheiro teu num ativo (compra nova). Sobe o Investido e o Valor actual em partes iguais — não gera valorização artificial.',
+    texto: 'Usa quando metes dinheiro teu num ativo (compra nova). Sobe o Investido e o Valor atual em partes iguais — não gera valorização artificial.',
     highlight: 'Ex: tinhas 1.000 € investidos e reforçaste com 200 €. Ficas com 1.200 € investidos e 1.200 € de valor.',
   },
   {
     emoji: '➖',
     titulo: 'Botão "− Retirar"',
-    texto: 'Usa quando retiras dinheiro do ativo (venda, resgate). Baixa o Investido e o Valor actual em partes iguais.',
-    highlight: 'Ex: vendes 100 € do ativo. O Investido e o Valor actual descem ambos 100 €.',
+    texto: 'Usa quando retiras dinheiro do ativo (venda, resgate). Baixa o Investido e o Valor atual em partes iguais.',
+    highlight: 'Ex: vendes 100 € do ativo. O Investido e o Valor atual descem ambos 100 €.',
   },
   {
     emoji: '💰',
-    titulo: 'Botão "Valor actual do investimento"',
-    texto: 'Usa quando o broker te mostra um valor diferente do último que registaste — é o mercado a mexer. Só o Valor actual muda; o Investido fica igual. É assim que a valorização aparece.',
+    titulo: 'Botão "Valor atual do investimento"',
+    texto: 'Usa quando o broker te mostra um valor diferente do último que registaste — é o mercado a mexer. Só o Valor atual muda; o Investido fica igual. É assim que a valorização aparece.',
     highlight: 'Ex: tens 1.000 € investidos e o broker mostra agora 1.080 € → a valorização passa a +8% (+80 €).',
   },
   {
