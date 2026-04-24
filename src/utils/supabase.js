@@ -97,10 +97,11 @@ export async function loadInvestmentsFromSupabase(userId) {
   const sb = getSupabaseClient();
   if (!sb || !userId) return null;
   try {
-    const [resDefs, resEntries, resFe] = await Promise.all([
+    const [resDefs, resEntries, resFe, resContribs] = await Promise.all([
       sb.from('investments').select('*').eq('user_id', userId),
       sb.from('investment_entries').select('*').eq('user_id', userId),
-      sb.from('fundo_emergencia').select('*').eq('user_id', userId)
+      sb.from('fundo_emergencia').select('*').eq('user_id', userId),
+      sb.from('investment_contribs').select('*').eq('user_id', userId)
     ]);
     const ativos = (!resDefs.error && resDefs.data)
       ? resDefs.data.map(r => ({ id: r.id, nome: r.name, tipo: r.type, cor: r.color || '#00D764', notas: r.notes || '' }))
@@ -112,11 +113,21 @@ export async function loadInvestmentsFromSupabase(userId) {
         ativoEntries[e.investment_id][e.month] = parseFloat(e.value) || 0;
       });
     }
+    const ativoContribs = {};
+    if (!resContribs.error && resContribs.data) {
+      resContribs.data.forEach(c => {
+        if (!ativoContribs[c.investment_id]) ativoContribs[c.investment_id] = {};
+        ativoContribs[c.investment_id][c.month] = parseFloat(c.amount) || 0;
+      });
+    } else if (resContribs.error) {
+      // Tabela pode ainda não existir (migration pendente) — degrada silenciosamente.
+      console.warn('investment_contribs:', resContribs.error.message);
+    }
     const feEntries = {};
     if (!resFe.error && resFe.data) {
       resFe.data.forEach(r => { feEntries[r.month] = { value: parseFloat(r.value) || 0, meta: parseFloat(r.meta) || 0 }; });
     }
-    return { ativos, ativoEntries, feEntries };
+    return { ativos, ativoEntries, ativoContribs, feEntries };
   } catch (e) {
     console.warn('loadInvestmentsFromSupabase failed:', e);
     return null;
@@ -144,6 +155,7 @@ export async function deleteAtivoFromSupabase(id, userId) {
   if (!sb || !userId) return;
   try {
     await sb.from('investment_entries').delete().eq('investment_id', id).eq('user_id', userId);
+    await sb.from('investment_contribs').delete().eq('investment_id', id).eq('user_id', userId);
     await sb.from('investments').delete().eq('id', id).eq('user_id', userId);
   } catch (e) {}
 }
@@ -153,6 +165,15 @@ export async function saveAtivoEntry(ativId, month, value, userId) {
   if (!sb || !userId) return false;
   try {
     const { error } = await sb.from('investment_entries').upsert([{ investment_id: ativId, user_id: userId, month, value }], { onConflict: 'investment_id,month' });
+    return !error;
+  } catch (e) { return false; }
+}
+
+export async function saveAtivoContrib(ativId, month, amount, userId) {
+  const sb = getSupabaseClient();
+  if (!sb || !userId) return false;
+  try {
+    const { error } = await sb.from('investment_contribs').upsert([{ investment_id: ativId, user_id: userId, month, amount }], { onConflict: 'investment_id,month' });
     return !error;
   } catch (e) { return false; }
 }

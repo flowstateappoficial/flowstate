@@ -3,11 +3,14 @@ import useIsMobile from '../hooks/useIsMobile';
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, DoughnutController, ArcElement, Tooltip } from 'chart.js';
 import { PT_M, PT_MESES, TIPO_COLORS } from '../utils/constants';
 import { txsComRegra } from '../utils/helpers';
-import { saveFundoEmergencia, saveAtivoEntry, deleteAtivoFromSupabase } from '../utils/supabase';
+import { saveFundoEmergencia, saveAtivoEntry, saveAtivoContrib, deleteAtivoFromSupabase } from '../utils/supabase';
+import InvestmentsTutorial from '../components/InvestmentsTutorial';
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, DoughnutController, ArcElement, Tooltip);
 
-export default function InvestmentsPage({ ativos, ativoEntries, feEntries, invMonth, setInvMonth, txsWithRules, currentUser, getFeForMonth, getAtivoValueForMonth, getTotalInvestidoForMonth, getPatrimonioForMonth, feMetaGlobal, updateFeEntries, updateAtivoEntries, saveAtivosLocal, onAddAtivo, onEditAtivo, fmtV, getCurrentMonth, calcOpen, onToggleCalc }) {
+const INV_TUTORIAL_KEY = 'fs_inv_tutorial_seen_v1';
+
+export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, feEntries, invMonth, setInvMonth, txsWithRules, currentUser, getFeForMonth, getAtivoValueForMonth, getAtivoInvestidoForMonth, getAtivoValorizacaoForMonth, getAtivoRendimentoPctForMonth, getTotalInvestidoForMonth, getPatrimonioForMonth, feMetaGlobal, updateFeEntries, updateAtivoEntries, updateAtivoContribs, saveAtivosLocal, onAddAtivo, onEditAtivo, fmtV, getCurrentMonth, calcOpen, onToggleCalc }) {
   const isMobile = useIsMobile();
   const patrimonioRef = useRef(null);
   const patrimonioChartRef = useRef(null);
@@ -19,6 +22,20 @@ export default function InvestmentsPage({ ativos, ativoEntries, feEntries, invMo
   const [feValInput, setFeValInput] = useState('');
   const [monthMenuOpen, setMonthMenuOpen] = useState(false);
   const monthMenuRef = useRef(null);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+
+  // Tutorial de formação — aparece na primeira visita ao separador.
+  useEffect(() => {
+    try {
+      const seen = localStorage.getItem(INV_TUTORIAL_KEY);
+      if (!seen) setTutorialOpen(true);
+    } catch {}
+  }, []);
+
+  const closeTutorial = () => {
+    setTutorialOpen(false);
+    try { localStorage.setItem(INV_TUTORIAL_KEY, '1'); } catch {}
+  };
 
   // Close month menu on outside click / Escape
   useEffect(() => {
@@ -153,15 +170,77 @@ export default function InvestmentsPage({ ativos, ativoEntries, feEntries, invMo
     if (currentUser) saveFundoEmergencia(invMonth, newEntries[invMonth].value, meta, currentUser.id);
   };
 
-  const handleSaveEntry = async (ativId) => {
-    const inp = document.getElementById('entry-' + ativId);
-    if (!inp) return;
-    const val = parseFloat(inp.value) || 0;
+  // Garante que um ativo tem pelo menos uma entrada em ativoContribs. Se for
+  // legacy (ativoEntries com dados mas sem contribs), faz backfill silencioso:
+  // a primeira contribuição fica igual ao valor do primeiro mês registado.
+  const ensureContribsBackfilled = (ativId, existingContribs) => {
+    if (Object.keys(existingContribs || {}).length > 0) return existingContribs || {};
+    const entradas = ativoEntries[ativId] || {};
+    const meses = Object.keys(entradas).sort();
+    if (meses.length === 0) return {};
+    const primeiro = meses[0];
+    return { [primeiro]: entradas[primeiro] || 0 };
+  };
+
+  const persistContribForMonth = async (ativId, ym, novoContribMes, allContribs) => {
+    const newContribs = { ...allContribs };
+    if (!newContribs[ativId]) newContribs[ativId] = {};
+    newContribs[ativId] = { ...newContribs[ativId], [ym]: novoContribMes };
+    updateAtivoContribs(newContribs);
+    if (currentUser) saveAtivoContrib(ativId, ym, novoContribMes, currentUser.id);
+  };
+
+  const persistEntryForMonth = async (ativId, ym, novoValor) => {
     const newEntries = { ...ativoEntries };
     if (!newEntries[ativId]) newEntries[ativId] = {};
-    newEntries[ativId][invMonth] = val;
+    newEntries[ativId] = { ...newEntries[ativId], [ym]: novoValor };
     updateAtivoEntries(newEntries);
-    if (currentUser) saveAtivoEntry(ativId, invMonth, val, currentUser.id);
+    if (currentUser) saveAtivoEntry(ativId, ym, novoValor, currentUser.id);
+  };
+
+  const handleReforcarAtivo = async (ativId) => {
+    const atual = getAtivoValueForMonth(ativId, invMonth);
+    const valor = parseFloat(prompt(`Quanto queres adicionar a este ativo? (€)\nValor atual: ${atual.toLocaleString('pt-PT')} €`));
+    if (!valor || isNaN(valor) || valor <= 0) return;
+
+    const base = ensureContribsBackfilled(ativId, ativoContribs[ativId]);
+    const novaBaseContribs = { ...ativoContribs, [ativId]: base };
+    const contribActualMes = (base[invMonth] || 0) + valor;
+    await persistContribForMonth(ativId, invMonth, contribActualMes, novaBaseContribs);
+
+    if (currentUser && Object.keys(ativoContribs[ativId] || {}).length === 0) {
+      const primeiro = Object.keys(base).find(m => m !== invMonth);
+      if (primeiro) saveAtivoContrib(ativId, primeiro, base[primeiro], currentUser.id);
+    }
+
+    await persistEntryForMonth(ativId, invMonth, atual + valor);
+  };
+
+  const handleRetirarAtivo = async (ativId) => {
+    const atual = getAtivoValueForMonth(ativId, invMonth);
+    if (atual <= 0) { alert('Não há valor para retirar neste mês.'); return; }
+    const valor = parseFloat(prompt(`Quanto queres retirar deste ativo? (€)\nValor atual: ${atual.toLocaleString('pt-PT')} €`));
+    if (!valor || isNaN(valor) || valor <= 0) return;
+
+    const base = ensureContribsBackfilled(ativId, ativoContribs[ativId]);
+    const novaBaseContribs = { ...ativoContribs, [ativId]: base };
+    const contribActualMes = (base[invMonth] || 0) - valor;
+    await persistContribForMonth(ativId, invMonth, contribActualMes, novaBaseContribs);
+
+    if (currentUser && Object.keys(ativoContribs[ativId] || {}).length === 0) {
+      const primeiro = Object.keys(base).find(m => m !== invMonth);
+      if (primeiro) saveAtivoContrib(ativId, primeiro, base[primeiro], currentUser.id);
+    }
+
+    await persistEntryForMonth(ativId, invMonth, Math.max(0, atual - valor));
+  };
+
+  const handleActualizarValorAtivo = async (ativId) => {
+    const atual = getAtivoValueForMonth(ativId, invMonth);
+    const novoStr = prompt(`Qual o valor actual deste investimento segundo o broker? (€)\nValor registado: ${atual.toLocaleString('pt-PT')} €\n\nUsa este botão quando o mercado mexer. Para adicionar ou retirar dinheiro teu, usa os botões + Reforçar / − Retirar.`);
+    const novo = parseFloat(novoStr);
+    if (novoStr === null || isNaN(novo) || novo < 0) return;
+    await persistEntryForMonth(ativId, invMonth, novo);
   };
 
   const handleDeleteAtivo = async (id) => {
@@ -169,8 +248,11 @@ export default function InvestmentsPage({ ativos, ativoEntries, feEntries, invMo
     const newAtivos = ativos.filter(a => String(a.id) !== String(id));
     const newEntries = { ...ativoEntries };
     delete newEntries[id];
+    const newContribs = { ...ativoContribs };
+    delete newContribs[id];
     saveAtivosLocal(newAtivos);
     updateAtivoEntries(newEntries);
+    updateAtivoContribs(newContribs);
     if (currentUser) deleteAtivoFromSupabase(id, currentUser.id);
   };
 
@@ -360,15 +442,18 @@ export default function InvestmentsPage({ ativos, ativoEntries, feEntries, invMo
       </div>
 
       {/* Ativos list */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.75rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.75rem', gap: 8, flexWrap: 'wrap' }}>
         <div className="slbl" style={{ margin: 0 }}>Ativos neste mês</div>
-        <button onClick={onAddAtivo} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--accent)', background: 'var(--accent-dim)', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontFamily: 'var(--font)' }}>+ Adicionar ativo</button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button onClick={() => setTutorialOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: 'var(--t3)', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '7px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>ℹ️ Como funciona?</button>
+          <button onClick={onAddAtivo} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--accent)', background: 'var(--accent-dim)', border: 'none', borderRadius: 8, padding: '7px 14px', cursor: 'pointer', fontFamily: 'var(--font)' }}>+ Adicionar ativo</button>
+        </div>
       </div>
 
       <div style={{ background: 'rgba(0,215,100,.06)', border: '1px solid rgba(0,215,100,.15)', borderRadius: 12, padding: '.9rem 1.1rem', marginBottom: '1.25rem', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>💡</span>
         <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.65 }}>
-          <strong style={{ color: 'var(--t1)' }}>Como registar os teus investimentos:</strong> Adiciona cada ativo e insere mensalmente o <strong style={{ color: 'var(--accent)' }}>valor atual total</strong> — já com valorizações ou desvalorizações incluídas.
+          <strong style={{ color: 'var(--t1)' }}>3 acções por ativo:</strong> <strong style={{ color: 'var(--accent)' }}>+ Reforçar</strong> quando metes dinheiro, <strong style={{ color: 'var(--red-soft)' }}>− Retirar</strong> quando tiras, <strong style={{ color: '#7b7fff' }}>💰 Valor actual</strong> quando o broker mostra um valor diferente (movimento do mercado).
         </div>
       </div>
 
@@ -384,9 +469,15 @@ export default function InvestmentsPage({ ativos, ativoEntries, feEntries, invMo
             const val = getAtivoValueForMonth(a.id, invMonth);
             const cor = a.cor || TIPO_COLORS[a.tipo] || '#6e7491';
             const totalMes = getTotalInvestidoForMonth(invMonth) || 1;
-            const pct = Math.round((val / totalMes) * 100) || 0;
+            const pctDoMes = Math.round((val / totalMes) * 100) || 0;
+            const investido = getAtivoInvestidoForMonth(a.id, invMonth);
+            const valorizacao = getAtivoValorizacaoForMonth(a.id, invMonth);
+            const rendPct = getAtivoRendimentoPctForMonth(a.id, invMonth);
+            const positive = valorizacao >= 0;
             const prevVal = getAtivoValueForMonth(a.id, prevMonth);
-            const diff = prevVal > 0 ? ((val - prevVal) / prevVal * 100).toFixed(1) : null;
+            const contribMes = ((ativoContribs[a.id] || {})[invMonth] || 0);
+            const variacaoMercado = prevVal > 0 ? (val - prevVal - contribMes) : 0;
+            const varMercadoPct = prevVal > 0 ? ((variacaoMercado / prevVal) * 100) : null;
             return (
               <div key={a.id} style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -399,23 +490,44 @@ export default function InvestmentsPage({ ativos, ativoEntries, feEntries, invMo
                     <button onClick={() => handleDeleteAtivo(a.id)} style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: 'rgba(229,57,53,.1)', cursor: 'pointer', color: 'var(--red-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 }}>✕</button>
                   </div>
                 </div>
+
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--t1)' }}>{fmtV(val)}</div>
-                {diff !== null ? (
-                  <div style={{ fontSize: 11, color: parseFloat(diff) >= 0 ? 'var(--accent)' : 'var(--red-soft)', marginTop: 2 }}>{parseFloat(diff) >= 0 ? '↑' : '↓'} {Math.abs(diff)}% vs mês anterior</div>
+
+                {rendPct !== null && investido > 0 ? (
+                  <div style={{ fontSize: 12, color: positive ? 'var(--accent)' : 'var(--red-soft)', marginTop: 2, fontWeight: 700 }}>
+                    {positive ? '↑' : '↓'} {positive ? '+' : ''}{rendPct.toFixed(1)}% ({positive ? '+' : ''}{fmtV(valorizacao)}) desde início
+                  </div>
                 ) : (
-                  <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>Primeiro registo</div>
+                  <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>Sem valorização calculada ainda</div>
                 )}
-                <div style={{ height: 3, background: 'rgba(255,255,255,.06)', borderRadius: 2, marginTop: 10 }}><div style={{ width: pct + '%', height: '100%', background: cor, borderRadius: 2, transition: 'width .8s' }} /></div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-                  <input type="number" id={'entry-' + a.id} defaultValue={val || ''} placeholder="Valor neste mês" min="0" step="10"
-                    style={{ flex: 1, background: 'rgba(255,255,255,.07)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 10px', color: 'var(--t1)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, outline: 'none' }} />
-                  <button onClick={() => handleSaveEntry(a.id)} style={{ padding: '7px 14px', borderRadius: 8, background: 'var(--accent)', color: '#000', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>Guardar</button>
+
+                <div style={{ display: 'flex', gap: 10, fontSize: 10, color: 'var(--t3)', marginTop: 6, flexWrap: 'wrap' }}>
+                  <span>Investido: <strong style={{ color: 'var(--t2)' }}>{fmtV(investido)}</strong></span>
+                  {varMercadoPct !== null && Math.abs(varMercadoPct) >= 0.1 && (
+                    <span>
+                      Este mês: <strong style={{ color: variacaoMercado >= 0 ? 'var(--accent)' : 'var(--red-soft)' }}>
+                        {variacaoMercado >= 0 ? '+' : ''}{varMercadoPct.toFixed(1)}%
+                      </strong>
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ height: 3, background: 'rgba(255,255,255,.06)', borderRadius: 2, marginTop: 10 }}>
+                  <div style={{ width: pctDoMes + '%', height: '100%', background: cor, borderRadius: 2, transition: 'width .8s' }} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr) minmax(0,1fr) auto', gap: 6, marginTop: 10 }}>
+                  <button onClick={() => handleReforcarAtivo(a.id)} style={{ padding: 9, borderRadius: 8, background: 'var(--accent)', color: '#000', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>+ Reforçar</button>
+                  <button onClick={() => handleRetirarAtivo(a.id)} style={{ padding: 9, borderRadius: 8, background: 'rgba(229,57,53,.15)', color: 'var(--red-soft)', border: '1px solid rgba(229,57,53,.25)', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>− Retirar</button>
+                  <button onClick={() => handleActualizarValorAtivo(a.id)} title="Actualizar o valor total segundo o broker (movimento do mercado)" style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(123,127,255,.12)', color: '#7b7fff', border: '1px solid rgba(123,127,255,.25)', fontFamily: 'var(--font)', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>💰 Valor actual</button>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {tutorialOpen && <InvestmentsTutorial onClose={closeTutorial} />}
     </div>
   );
 }
