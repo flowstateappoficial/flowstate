@@ -5,6 +5,7 @@ import { PT_M, PT_MESES, TIPO_COLORS } from '../utils/constants';
 import { txsComRegra } from '../utils/helpers';
 import { saveFundoEmergencia, saveFundoContrib, saveAtivoEntry, saveAtivoContrib, deleteAtivoFromSupabase } from '../utils/supabase';
 import InvestmentsTutorial from '../components/InvestmentsTutorial';
+import { useDialog } from '../components/Dialog';
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, DoughnutController, ArcElement, Tooltip);
 
@@ -12,6 +13,7 @@ const INV_TUTORIAL_KEY = 'fs_inv_tutorial_seen_v1';
 
 export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, feEntries, feContribs, invMonth, setInvMonth, txsWithRules, currentUser, getFeForMonth, getAtivoValueForMonth, getAtivoInvestidoForMonth, getAtivoValorizacaoForMonth, getAtivoRendimentoPctForMonth, getFeInvestidoForMonth, getFeValorizacaoForMonth, getFeRendimentoPctForMonth, getTotalInvestidoForMonth, getPatrimonioForMonth, feMetaGlobal, updateFeEntries, updateFeContribs, updateAtivoEntries, updateAtivoContribs, saveAtivosLocal, onAddAtivo, onEditAtivo, fmtV, getCurrentMonth, calcOpen, onToggleCalc }) {
   const isMobile = useIsMobile();
+  const dialog = useDialog();
   const patrimonioRef = useRef(null);
   const patrimonioChartRef = useRef(null);
   const donutRef = useRef(null);
@@ -129,7 +131,14 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
   };
 
   const handleReforcar = async () => {
-    const valor = parseFloat(prompt('Quanto queres adicionar ao Fundo de Emergência? (€)'));
+    const raw = await dialog.prompt({
+      title: '+ Reforçar Fundo de Emergência',
+      message: 'Quanto queres adicionar?',
+      type: 'number', placeholder: '0', suffix: '€',
+      confirmText: 'Reforçar',
+    });
+    if (raw === null) return;
+    const valor = parseFloat(String(raw).replace(',', '.'));
     if (!valor || isNaN(valor) || valor <= 0) return;
 
     const baseContribs = ensureFeContribsBackfilled();
@@ -152,7 +161,14 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
   };
 
   const handleRetirar = async () => {
-    const valor = parseFloat(prompt('Quanto queres retirar do Fundo de Emergência? (€)'));
+    const raw = await dialog.prompt({
+      title: '− Retirar do Fundo de Emergência',
+      message: 'Quanto queres retirar?',
+      type: 'number', placeholder: '0', suffix: '€',
+      confirmText: 'Retirar', danger: true,
+    });
+    if (raw === null) return;
+    const valor = parseFloat(String(raw).replace(',', '.'));
     if (!valor || isNaN(valor) || valor <= 0) return;
 
     const baseContribs = ensureFeContribsBackfilled();
@@ -175,9 +191,15 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
   };
 
   const handleAtualizarValorFE = async () => {
-    const novoStr = prompt(`Qual o valor atual do Fundo de Emergência? (€)\nValor registado: ${fe.value.toLocaleString('pt-PT')} €\n\nUsa este botão quando os juros credidos pelo banco/produto fizerem o valor mexer. Para depositar ou levantar dinheiro teu, usa + Reforçar / − Retirar.`);
-    const novo = parseFloat(novoStr);
-    if (novoStr === null || isNaN(novo) || novo < 0) return;
+    const novoStr = await dialog.prompt({
+      title: '💰 Valor atual do Fundo',
+      message: `Valor registado: ${fe.value.toLocaleString('pt-PT')} €\n\nUsa este botão quando os juros do banco/produto fizerem o valor mexer. Para depositar ou levantar dinheiro teu, usa + Reforçar / − Retirar.`,
+      type: 'number', placeholder: String(fe.value), suffix: '€',
+      confirmText: 'Atualizar',
+    });
+    if (novoStr === null) return;
+    const novo = parseFloat(String(novoStr).replace(',', '.'));
+    if (isNaN(novo) || novo < 0) return;
     const newEntries = { ...feEntries };
     if (!newEntries[invMonth]) newEntries[invMonth] = { value: 0, meta: metaGlobal };
     newEntries[invMonth] = { ...newEntries[invMonth], value: novo };
@@ -198,7 +220,7 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
 
   const handleDefinirMeta = async (metaVal) => {
     const meta = parseFloat(metaVal) || 0;
-    if (meta <= 0) { alert('Insere um valor válido.'); return; }
+    if (meta <= 0) { dialog.alert({ message: 'Insere um valor válido.' }); return; }
     const newEntries = { ...feEntries };
     if (!newEntries[invMonth]) newEntries[invMonth] = { value: 0, meta: 0 };
     newEntries[invMonth].meta = meta;
@@ -236,7 +258,14 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
 
   const handleReforcarAtivo = async (ativId) => {
     const atual = getAtivoValueForMonth(ativId, invMonth);
-    const valor = parseFloat(prompt(`Quanto queres adicionar a este ativo? (€)\nValor atual: ${atual.toLocaleString('pt-PT')} €`));
+    const raw = await dialog.prompt({
+      title: '+ Reforçar ativo',
+      message: `Valor atual: ${atual.toLocaleString('pt-PT')} €\n\nQuanto queres adicionar?`,
+      type: 'number', placeholder: '0', suffix: '€',
+      confirmText: 'Reforçar',
+    });
+    if (raw === null) return;
+    const valor = parseFloat(String(raw).replace(',', '.'));
     if (!valor || isNaN(valor) || valor <= 0) return;
 
     const base = ensureContribsBackfilled(ativId, ativoContribs[ativId]);
@@ -254,8 +283,15 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
 
   const handleRetirarAtivo = async (ativId) => {
     const atual = getAtivoValueForMonth(ativId, invMonth);
-    if (atual <= 0) { alert('Não há valor para retirar neste mês.'); return; }
-    const valor = parseFloat(prompt(`Quanto queres retirar deste ativo? (€)\nValor atual: ${atual.toLocaleString('pt-PT')} €`));
+    if (atual <= 0) { await dialog.alert({ message: 'Não há valor para retirar neste mês.' }); return; }
+    const raw = await dialog.prompt({
+      title: '− Retirar do ativo',
+      message: `Valor atual: ${atual.toLocaleString('pt-PT')} €\n\nQuanto queres retirar?`,
+      type: 'number', placeholder: '0', suffix: '€',
+      confirmText: 'Retirar', danger: true,
+    });
+    if (raw === null) return;
+    const valor = parseFloat(String(raw).replace(',', '.'));
     if (!valor || isNaN(valor) || valor <= 0) return;
 
     const base = ensureContribsBackfilled(ativId, ativoContribs[ativId]);
@@ -273,14 +309,25 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
 
   const handleAtualizarValorAtivo = async (ativId) => {
     const atual = getAtivoValueForMonth(ativId, invMonth);
-    const novoStr = prompt(`Qual o valor atual deste investimento segundo o broker? (€)\nValor registado: ${atual.toLocaleString('pt-PT')} €\n\nUsa este botão quando o mercado mexer. Para adicionar ou retirar dinheiro teu, usa os botões + Reforçar / − Retirar.`);
-    const novo = parseFloat(novoStr);
-    if (novoStr === null || isNaN(novo) || novo < 0) return;
+    const novoStr = await dialog.prompt({
+      title: '💰 Valor atual do investimento',
+      message: `Valor registado: ${atual.toLocaleString('pt-PT')} €\n\nUsa este botão quando o mercado mexer. Para adicionar ou retirar dinheiro teu, usa + Reforçar / − Retirar.`,
+      type: 'number', placeholder: String(atual), suffix: '€',
+      confirmText: 'Atualizar',
+    });
+    if (novoStr === null) return;
+    const novo = parseFloat(String(novoStr).replace(',', '.'));
+    if (isNaN(novo) || novo < 0) return;
     await persistEntryForMonth(ativId, invMonth, novo);
   };
 
   const handleDeleteAtivo = async (id) => {
-    if (!confirm('Apagar este ativo e todo o seu histórico?')) return;
+    const ok = await dialog.confirm({
+      title: 'Apagar ativo?',
+      message: 'O ativo e todo o seu histórico são apagados. Esta acção não pode ser desfeita.',
+      confirmText: 'Apagar', danger: true,
+    });
+    if (!ok) return;
     const newAtivos = ativos.filter(a => String(a.id) !== String(id));
     const newEntries = { ...ativoEntries };
     delete newEntries[id];

@@ -9,9 +9,11 @@ import { openReportInNewTab, openReportPreviewInNewTab } from '../utils/reportGe
 import ReportUpgradeOverlay from '../components/ReportUpgradeOverlay';
 import DashboardSettings from '../components/DashboardSettings';
 import { generateWrappedData } from '../utils/wrappedAnalysis';
+import { useDialog } from '../components/Dialog';
 
-export default function DashboardPage({ txs, txsWithRules, objetivos, budget, rendimentoMensal, onOpenTxModal, onSwitchTab, onEditGoal, onAddGoal, onDeleteGoal, onOpenBudget, fmtV, fmtDate, getCurrentMonth, streak, badges, newBadges, ativos, feEntries, userPlan, onViewPlans, dashPrefs, onUpdateDashPrefs, onOpenWrapped }) {
+export default function DashboardPage({ txs, txsWithRules, objetivos, budget, rendimentoMensal, onOpenTxModal, onSwitchTab, onEditGoal, onAddGoal, onDeleteGoal, onAddToGoal, onWithdrawFromGoal, onOpenBudget, onOpenBudgetEdit, fmtV, fmtDate, getCurrentMonth, streak, badges, newBadges, ativos, feEntries, userPlan, onViewPlans, dashPrefs, onUpdateDashPrefs, onOpenWrapped }) {
   const isMobile = useIsMobile();
+  const dialog = useDialog();
   const [reportOverlay, setReportOverlay] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reportPickerOpen, setReportPickerOpen] = useState(false);
@@ -67,7 +69,7 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
           } else {
             const wrappedData = generateWrappedData({ txs, objetivos, year: new Date().getFullYear() });
             if (wrappedData) onOpenWrapped(wrappedData.slides);
-            else alert('Sem transações suficientes para gerar o Wrapped.');
+            else dialog.alert({ title: 'Wrapped indisponível', message: 'Sem transações suficientes para gerar o Wrapped deste ano.' });
           }
         }} style={{
           background: 'rgba(255,255,255,.04)', border: '1px solid rgba(123,127,255,.2)', borderRadius: 12,
@@ -284,7 +286,12 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
       {/* Budget */}
       {show('budget') && <><div className="slbl" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span>Orçamento do mês</span>
-        <button onClick={onOpenBudget} style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', background: 'var(--accent-dim)', border: 'none', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>⚙️ Gerir</button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {budgetCats.length > 0 && (
+            <button onClick={onOpenBudgetEdit || onOpenBudget} title="Editar valores do orçamento sem mexer no rendimento" style={{ fontSize: 11, fontWeight: 600, color: 'var(--t2)', background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>Editar</button>
+          )}
+          <button onClick={onOpenBudget} title="Gerir rendimento e orçamento" style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', background: 'var(--accent-dim)', border: 'none', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>⚙️ Gerir</button>
+        </div>
       </div>
       <div className="card" style={{ marginBottom: '2rem' }}>
         {budgetCats.length === 0 ? (
@@ -334,13 +341,14 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span className="obj-vals"><strong>{o.atual.toLocaleString('pt-PT')} €</strong> / {o.meta.toLocaleString('pt-PT')} €</span>
                     <span className="obj-pct">{pct}%</span>
-                    <div className="obj-actions">
-                      <button className="obj-btn" onClick={() => onEditGoal(String(o.id))}>✏️</button>
-                      <button className="obj-btn del" onClick={() => onDeleteGoal(String(o.id))}>✕</button>
-                    </div>
                   </div>
                 </div>
                 <div className="bar-bg"><div className="bar-fill" style={{ width: pct + '%', background: o.cor || 'var(--accent)' }} /></div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) auto', gap: 6, marginTop: 8 }}>
+                  <button onClick={() => onAddToGoal && onAddToGoal(String(o.id))} style={{ padding: 8, borderRadius: 8, background: 'var(--accent)', color: '#000', border: 'none', fontFamily: 'var(--font)', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>+ Reforçar</button>
+                  <button onClick={() => onWithdrawFromGoal && onWithdrawFromGoal(String(o.id))} style={{ padding: 8, borderRadius: 8, background: 'rgba(229,57,53,.15)', color: 'var(--red-soft)', border: '1px solid rgba(229,57,53,.25)', fontFamily: 'var(--font)', fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>− Retirar</button>
+                  <button onClick={() => onEditGoal(String(o.id))} title="Editar nome, meta, cor ou apagar" style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,.06)', color: 'var(--t3)', border: 'none', fontFamily: 'var(--font)', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Editar</button>
+                </div>
               </div>
             );
           })}

@@ -32,6 +32,7 @@ import AppTour from './components/AppTour';
 import PaywallOverlay from './components/PaywallOverlay';
 import LegalOverlay from './components/LegalOverlay';
 import PasswordResetOverlay from './components/PasswordResetOverlay';
+import { useDialog } from './components/Dialog';
 import { updateStreak, evaluateBadges } from './utils/gamification';
 import { evaluateNotifications, evaluateTrialNotifications, loadNotifications, loadReadIds, markAllRead as markAllReadUtil } from './utils/notifications';
 import NotificationCenter from './components/NotificationCenter';
@@ -51,6 +52,7 @@ import useBetaStatus from './hooks/useBetaStatus';
 export default function App() {
   // ── RESPONSIVE ──
   const isMobile = useIsMobile();
+  const dialog = useDialog();
 
   // ── AUTH STATE ──
   const [currentUser, setCurrentUser] = useState(null);
@@ -96,6 +98,9 @@ export default function App() {
   // do email de "Esqueceste-te da password?" (Supabase emite o evento
   // PASSWORD_RECOVERY após processar o token na URL).
   const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
+  // Quando true, abre o OnboardingOverlay diretamente no passo de orçamento
+  // (sem rendimento) — usado pelo botão "Editar orçamento" do dashboard.
+  const [onboardingBudgetOnly, setOnboardingBudgetOnly] = useState(false);
   const [billingAnual, setBillingAnual] = useState(false);
 
   // ── GAMIFICATION ──
@@ -151,7 +156,7 @@ export default function App() {
   // Falls back to local-only trial if Stripe isn't configured yet (dev mode).
   const startTrial = useCallback(async () => {
     if (isBetaActive) {
-      alert('A subscrição Plus fica disponível assim que a beta fechada terminar. Os teus meses Plus acumulados serão aplicados automaticamente no primeiro checkout.');
+      await dialog.alert({ title: 'A beta ainda está a decorrer', message: 'A subscrição Plus fica disponível assim que a beta fechada terminar. Os teus meses Plus acumulados serão aplicados automaticamente no primeiro checkout.' });
       return;
     }
     try {
@@ -167,14 +172,14 @@ export default function App() {
   // Subscribe without trial (user already used trial or explicitly wants to pay now).
   const subscribeViaStripe = useCallback(async (plan = 'plus', interval = 'month') => {
     if (isBetaActive) {
-      alert('A subscrição fica disponível assim que a beta fechada terminar. Os teus meses Plus acumulados serão aplicados automaticamente no primeiro checkout.');
+      await dialog.alert({ title: 'A beta ainda está a decorrer', message: 'A subscrição fica disponível assim que a beta fechada terminar. Os teus meses Plus acumulados serão aplicados automaticamente no primeiro checkout.' });
       return;
     }
     try {
       await startCheckout({ plan, interval, withTrial: false });
     } catch (e) {
       console.warn('Stripe checkout unavailable:', e?.message || e);
-      alert('Pagamentos temporariamente indisponíveis. Tenta novamente em instantes.');
+      await dialog.alert({ title: 'Erro nos pagamentos', message: 'Pagamentos temporariamente indisponíveis. Tenta novamente em instantes.' });
     }
   }, [isBetaActive]);
 
@@ -715,11 +720,52 @@ export default function App() {
   }, [objetivos, currentUser, saveObjetivosLocal]);
 
   const deleteGoal = useCallback(async (id) => {
-    if (!confirm('Apagar este objetivo?')) return;
+    const ok = await dialog.confirm({
+      title: 'Apagar objetivo?',
+      message: 'Esta acção não pode ser desfeita.',
+      confirmText: 'Apagar', danger: true,
+    });
+    if (!ok) return;
     const newObj = objetivos.filter(o => String(o.id) !== String(id));
     saveObjetivosLocal(newObj);
     if (currentUser) deleteGoalFromSupabase(id, currentUser.id);
   }, [objetivos, currentUser, saveObjetivosLocal]);
+
+  const addToGoal = useCallback(async (id) => {
+    const obj = objetivos.find(o => String(o.id) === String(id));
+    if (!obj) return;
+    const raw = await dialog.prompt({
+      title: `+ Reforçar "${obj.nome}"`,
+      message: `Atual: ${obj.atual.toLocaleString('pt-PT')} € · Meta: ${obj.meta.toLocaleString('pt-PT')} €`,
+      type: 'number', placeholder: '0', suffix: '€',
+      confirmText: 'Reforçar',
+    });
+    if (raw === null) return;
+    const valor = parseFloat(String(raw).replace(',', '.'));
+    if (!valor || isNaN(valor) || valor <= 0) return;
+    const novoAtual = Math.min(obj.meta, obj.atual + valor);
+    await saveGoal({ ...obj, atual: novoAtual });
+  }, [objetivos, saveGoal, dialog]);
+
+  const withdrawFromGoal = useCallback(async (id) => {
+    const obj = objetivos.find(o => String(o.id) === String(id));
+    if (!obj) return;
+    if (obj.atual <= 0) {
+      await dialog.alert({ message: 'Este objetivo ainda não tem nenhum montante poupado.' });
+      return;
+    }
+    const raw = await dialog.prompt({
+      title: `− Retirar de "${obj.nome}"`,
+      message: `Atual: ${obj.atual.toLocaleString('pt-PT')} €`,
+      type: 'number', placeholder: '0', suffix: '€',
+      confirmText: 'Retirar', danger: true,
+    });
+    if (raw === null) return;
+    const valor = parseFloat(String(raw).replace(',', '.'));
+    if (!valor || isNaN(valor) || valor <= 0) return;
+    const novoAtual = Math.max(0, obj.atual - valor);
+    await saveGoal({ ...obj, atual: novoAtual });
+  }, [objetivos, saveGoal, dialog]);
 
   // ── INVESTMENT HELPERS ──
   // Returns FE entry for a given month. If no entry exists, carries forward the
@@ -899,7 +945,10 @@ export default function App() {
             onEditGoal={(id) => { setGoalEditId(id); setGoalModalOpen(true); }}
             onAddGoal={() => { setGoalEditId(null); setGoalModalOpen(true); }}
             onDeleteGoal={deleteGoal}
-            onOpenBudget={() => { setOnboardingEditMode(true); setOnboardingOpen(true); }}
+            onAddToGoal={addToGoal}
+            onWithdrawFromGoal={withdrawFromGoal}
+            onOpenBudget={() => { setOnboardingEditMode(true); setOnboardingBudgetOnly(false); setOnboardingOpen(true); }}
+            onOpenBudgetEdit={() => { setOnboardingEditMode(true); setOnboardingBudgetOnly(true); setOnboardingOpen(true); }}
             fmtV={fmtV}
             fmtDate={fmtDate}
             getCurrentMonth={getCurrentMonth}
@@ -1066,6 +1115,11 @@ export default function App() {
           objetivos={objetivos}
           onClose={() => { setGoalModalOpen(false); setGoalEditId(null); }}
           onSave={saveGoal}
+          onDelete={async (id) => {
+            await deleteGoal(id);
+            setGoalModalOpen(false);
+            setGoalEditId(null);
+          }}
         />
       )}
 
@@ -1098,6 +1152,7 @@ export default function App() {
           budget={budget}
           rendimentoMensal={rendimentoMensal}
           editOnly={onboardingEditMode}
+          editOnlyBudget={onboardingBudgetOnly}
           onFinish={async (newBudget, newRendimento) => {
             await saveBudgetLocal(newBudget, newRendimento);
             const wasEditMode = onboardingEditMode;
@@ -1112,12 +1167,13 @@ export default function App() {
             }
             setOnboardingOpen(false);
             setOnboardingEditMode(false);
+            setOnboardingBudgetOnly(false);
             // Só dispara o tour interactivo no onboarding inicial, não quando o user só veio editar orçamento.
             if (!wasEditMode) {
               setTimeout(() => setTourOpen(true), 400);
             }
           }}
-          onClose={() => { setOnboardingOpen(false); setOnboardingEditMode(false); }}
+          onClose={() => { setOnboardingOpen(false); setOnboardingEditMode(false); setOnboardingBudgetOnly(false); }}
         />
       )}
 
@@ -1250,8 +1306,7 @@ export default function App() {
           <style>{`@keyframes toastSlideIn{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:translateX(0)}}`}</style>
         </div>
       )}
-
-      {/* Feedback Button (beta fechada) — live na Navbar */}
+      {/* Feedback Button (beta fechada) */}
     </>
   );
 }

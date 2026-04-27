@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Código de verificação — Flowstate</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0d1f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#e7ecff;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0a0d1f;">
+    <tr>
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
+          <tr>
+            <td align="center" style="padding-bottom:32px;">
+              <div style="font-size:22px;font-weight:800;letter-spacing:-.02em;color:#00D764;">FLOWSTATE</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="background:#161a2e;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:32px 28px;">
+
+              <div style="display:inline-block;padding:6px 12px;border-radius:20px;background:rgba(123,127,255,.15);color:#7b7fff;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;margin-bottom:20px;">
+                Verificação de segurança
+              </div>
+
+              <h1 style="font-size:24px;font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 16px;line-height:1.25;">
+                Confirma que és tu.
+              </h1>
+
+              <p style="font-size:15px;line-height:1.6;color:#b8bfda;margin:0 0 24px;">
+                Estás a fazer uma operação sensível na tua conta <strong style="color:#fff;">{{ .Email }}</strong>. Usa o código abaixo para confirmar.
+              </p>
+
+              <!-- Código grande -->
+              <div style="text-align:center;padding:24px 16px;border-radius:12px;background:rgba(0,215,100,.08);border:1px solid rgba(0,215,100,.25);margin:8px 0 24px;">
+                <div style="font-size:11px;color:#00D764;text-transform:uppercase;letter-spacing:.15em;margin-bottom:10px;font-weight:700;">
+                  Código de verificação
+                </div>
+                <div style="font-size:36px;font-weight:800;color:#fff;letter-spacing:.4em;font-family:'SF Mono',Menlo,Consolas,monospace;">
+                  {{ .Token }}
+                </div>
+              </div>
+
+              <p style="font-size:13px;line-height:1.6;color:#b8bfda;margin:0 0 12px;">
+                Volta à app Flowstate e introduz este código no campo de verificação.
+              </p>
+
+              <div style="margin-top:20px;padding:14px 16px;border-radius:10px;background:rgba(247,147,26,.06);border:1px solid rgba(247,147,26,.2);">
+                <div style="font-size:12px;color:#f7931a;font-weight:700;margin-bottom:4px;">⚠️ Não foste tu?</div>
+                <div style="font-size:12px;color:#b8bfda;line-height:1.5;">
+                  Alguém pode estar a tentar aceder à tua conta. Não partilhes este código com ninguém. Muda já a tua password e contacta-nos.
+                </div>
+              </div>
+
+              <p style="font-size:12px;line-height:1.6;color:#6e7491;margin:20px 0 0;">
+                O código expira em 5 minutos.
+              </p>
+
+            </td>
+          </tr>
+
+          <tr>
+            <td align="center" style="padding:24px 8px 0;">
+              <div style="font-size:12px;color:#6e7491;line-height:1.7;">
+                Precisas de ajuda? <a href="mailto:suporte@flowstateapp.pt" style="color:#00D764;text-decoration:none;">suporte@flowstateapp.pt</a>
+                <br />
+                <span style="font-size:11px;">© Flowstate · A tua app de finanças pessoais.</span>
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

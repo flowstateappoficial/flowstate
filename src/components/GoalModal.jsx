@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 const COLORS = ['#00D764', '#7b7fff', '#f7931a', '#00b4d8', '#e53935'];
 
-export default function GoalModal({ editId, objetivos, onClose, onSave }) {
+export default function GoalModal({ editId, objetivos, onClose, onSave, onDelete }) {
   const [nome, setNome] = useState('');
   const [atual, setAtual] = useState('');
   const [meta, setMeta] = useState('');
@@ -64,6 +64,13 @@ export default function GoalModal({ editId, objetivos, onClose, onSave }) {
           <button className="btn-add" onClick={handleSave}>Guardar</button>
           <button className="btn-close-modal" onClick={onClose}>Cancelar</button>
         </div>
+        {editId && onDelete && (
+          <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+            <button onClick={() => onDelete(String(editId))} style={{ width: '100%', padding: 10, borderRadius: 10, background: 'rgba(229,57,53,.1)', color: 'var(--red-soft)', border: '1px solid rgba(229,57,53,.25)', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+              Apagar este objetivo
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

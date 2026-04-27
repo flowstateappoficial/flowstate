@@ -53,9 +53,13 @@ export default function OnboardingOverlay({
   // com botão "Guardar" — usado pelo botão ⚙️ Gerir para editar valores sem
   // voltar a fazer o tour completo.
   editOnly = false,
+  // editOnlyBudget=true salta também o passo de rendimento e arranca direto no
+  // orçamento — usado pelo botão "Editar orçamento" do dashboard.
+  editOnlyBudget = false,
 }) {
   // Em modo edit, arrancamos no incomeStep (= TOTAL_WELCOME + 1).
-  const initialStep = editOnly ? TOTAL_WELCOME + 1 : 0;
+  // Em modo editOnlyBudget, arrancamos no budgetStep (= TOTAL_WELCOME + 2).
+  const initialStep = editOnlyBudget ? TOTAL_WELCOME + 2 : (editOnly ? TOTAL_WELCOME + 1 : 0);
   const [step, setStep] = useState(initialStep);
   const [goal, setGoal] = useState(null);
   const [rendimento, setRendimento] = useState(initialRendimento || 0);
