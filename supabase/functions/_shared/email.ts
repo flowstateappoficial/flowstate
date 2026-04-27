@@ -5,7 +5,7 @@
 //
 // Env vars:
 //   RESEND_API_KEY   re_...
-//   EMAIL_FROM       "Flowstate <no-reply@flowstate.pt>"  (falls back to sandbox)
+//   EMAIL_FROM       "Flowstate <no-reply@flowstateapp.pt>"  (falls back to sandbox)
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 
@@ -144,7 +144,7 @@ export function welcomeTrialHtml(opts: {
 
     <div style="text-align:center;margin-top:24px;font-size:12px;color:#6e7491;line-height:1.6;">
       Precisas de ajuda? Responde a este email ou escreve para
-      <a href="mailto:suporte@flowstate.pt" style="color:#00D764;text-decoration:none;">suporte@flowstate.pt</a>.
+      <a href="mailto:suporte@flowstateapp.pt" style="color:#00D764;text-decoration:none;">suporte@flowstateapp.pt</a>.
       <br />
       Podes gerir ou cancelar a tua subscrição em qualquer momento em <em>A minha conta</em>.
     </div>
@@ -171,6 +171,6 @@ export function welcomeTrialText(opts: {
     `O teu trial termina em ${dateFmt}. Podes cancelar antes sem qualquer custo em A minha conta.`,
     ``,
     `— Equipa Flowstate`,
-    `suporte@flowstate.pt`,
+    `suporte@flowstateapp.pt`,
   ].join('\n');
 }

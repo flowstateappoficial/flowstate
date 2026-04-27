@@ -8,9 +8,20 @@ export default function TransactionModal({ onClose, onAdd }) {
   const [type, setType] = useState('despesa');
   const [cat, setCat] = useState('Alimentação');
 
+  // Sanitiza input do valor: remove sinais +/− e qualquer carácter não numérico
+  // (excepto vírgula e ponto, que são separadores decimais válidos). Evita que
+  // o utilizador insira valores negativos por engano — o sinal é determinado
+  // pela escolha de "Despesa" vs "Rendimento" no campo Tipo.
+  const handleValChange = (raw) => {
+    const cleaned = String(raw).replace(/[^0-9.,]/g, '').replace(',', '.');
+    setVal(cleaned);
+  };
+
   const handleSubmit = () => {
     if (!desc || !val || !date) return;
-    onAdd({ desc, val: parseFloat(val), date, type, cat });
+    const parsed = Math.abs(parseFloat(val));
+    if (isNaN(parsed) || parsed <= 0) return;
+    onAdd({ desc, val: parsed, date, type, cat });
   };
 
   return (
@@ -24,7 +35,7 @@ export default function TransactionModal({ onClose, onAdd }) {
         <div className="form-row">
           <div className="form-field">
             <label>Valor (€)</label>
-            <input type="number" value={val} onChange={e => setVal(e.target.value)} placeholder="0.00" step="0.01" min="0" />
+            <input type="text" inputMode="decimal" value={val} onChange={e => handleValChange(e.target.value)} placeholder="0.00" />
           </div>
           <div className="form-field">
             <label>Data</label>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { openCustomerPortal, readCachedSubscription } from '../utils/subscription';
 import { getTrialStatus } from '../utils/trial';
+import { getSupabaseClient } from '../utils/supabase';
 import useIsMobile from '../hooks/useIsMobile';
 
 const PLAN_CFG = {
@@ -39,6 +40,45 @@ export default function AccountPage({ currentUser, userPlan, onSwitchTab, onLogo
   const isMobile = useIsMobile();
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState(null);
+
+  // Password change
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwMessage, setPwMessage] = useState(null); // { kind: 'success'|'error', text: string }
+
+  const submitPasswordChange = async () => {
+    setPwMessage(null);
+    if (pwNew.length < 8) {
+      setPwMessage({ kind: 'error', text: 'A password tem de ter pelo menos 8 caracteres.' });
+      return;
+    }
+    if (pwNew !== pwConfirm) {
+      setPwMessage({ kind: 'error', text: 'As passwords não coincidem.' });
+      return;
+    }
+    const sb = getSupabaseClient();
+    if (!sb) {
+      setPwMessage({ kind: 'error', text: 'Sessão indisponível. Volta a iniciar sessão e tenta de novo.' });
+      return;
+    }
+    setPwLoading(true);
+    try {
+      const { error } = await sb.auth.updateUser({ password: pwNew });
+      if (error) {
+        setPwMessage({ kind: 'error', text: error.message || 'Não foi possível alterar a password.' });
+      } else {
+        setPwMessage({ kind: 'success', text: 'Password alterada com sucesso.' });
+        setPwNew(''); setPwConfirm('');
+        setTimeout(() => { setPwOpen(false); setPwMessage(null); }, 1800);
+      }
+    } catch (e) {
+      setPwMessage({ kind: 'error', text: 'Erro inesperado. Tenta novamente.' });
+    } finally {
+      setPwLoading(false);
+    }
+  };
 
   const sub = readCachedSubscription();
   const trialStatus = getTrialStatus();
@@ -229,6 +269,81 @@ export default function AccountPage({ currentUser, userPlan, onSwitchTab, onLogo
             </div>
           </div>
 
+          {/* Alterar password */}
+          <div style={{ padding: '14px 0', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 13, color: 'var(--t2)', fontWeight: 600 }}>Password</div>
+                <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>Mínimo 8 caracteres.</div>
+              </div>
+              <button
+                onClick={() => { setPwOpen(o => !o); setPwMessage(null); setPwNew(''); setPwConfirm(''); }}
+                style={{
+                  padding: '10px 16px', borderRadius: 10,
+                  background: pwOpen ? 'rgba(255,255,255,.1)' : 'rgba(255,255,255,.06)',
+                  color: 'var(--t2)', border: '1px solid rgba(255,255,255,.12)',
+                  fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                {pwOpen ? 'Cancelar' : 'Alterar'}
+              </button>
+            </div>
+
+            {pwOpen && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input
+                  type="password"
+                  value={pwNew}
+                  onChange={e => setPwNew(e.target.value)}
+                  placeholder="Nova password"
+                  autoComplete="new-password"
+                  style={{
+                    background: 'rgba(255,255,255,.07)', border: '1px solid var(--border)',
+                    borderRadius: 9, padding: '10px 14px', color: 'var(--t1)',
+                    fontFamily: 'var(--font)', fontSize: 14, outline: 'none',
+                  }}
+                />
+                <input
+                  type="password"
+                  value={pwConfirm}
+                  onChange={e => setPwConfirm(e.target.value)}
+                  placeholder="Confirmar nova password"
+                  autoComplete="new-password"
+                  onKeyDown={e => { if (e.key === 'Enter') submitPasswordChange(); }}
+                  style={{
+                    background: 'rgba(255,255,255,.07)', border: '1px solid var(--border)',
+                    borderRadius: 9, padding: '10px 14px', color: 'var(--t1)',
+                    fontFamily: 'var(--font)', fontSize: 14, outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={submitPasswordChange}
+                  disabled={pwLoading}
+                  style={{
+                    padding: '11px 18px', borderRadius: 10,
+                    background: pwLoading ? 'rgba(0,215,100,.4)' : '#00D764',
+                    color: '#000', border: 'none',
+                    fontFamily: 'var(--font)', fontSize: 12, fontWeight: 800,
+                    letterSpacing: '.1em', textTransform: 'uppercase',
+                    cursor: pwLoading ? 'wait' : 'pointer',
+                  }}
+                >
+                  {pwLoading ? 'A guardar…' : 'Guardar nova password'}
+                </button>
+                {pwMessage && (
+                  <div style={{
+                    padding: '10px 12px', borderRadius: 10, fontSize: 12,
+                    background: pwMessage.kind === 'success' ? 'rgba(0,215,100,.08)' : 'rgba(255,107,107,.08)',
+                    border: '1px solid ' + (pwMessage.kind === 'success' ? 'rgba(0,215,100,.25)' : 'rgba(255,107,107,.25)'),
+                    color: pwMessage.kind === 'success' ? 'var(--accent)' : '#ff6b6b',
+                  }}>
+                    {pwMessage.text}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0' }}>
             <div>
               <div style={{ fontSize: 13, color: 'var(--t2)', fontWeight: 600 }}>Terminar sessão</div>
@@ -250,7 +365,7 @@ export default function AccountPage({ currentUser, userPlan, onSwitchTab, onLogo
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 24, fontSize: 11, color: 'var(--t3)' }}>
-          Para apagar a conta, contacta <a href="mailto:suporte@flowstate.pt" style={{ color: 'var(--accent)' }}>suporte@flowstate.pt</a>.
+          Para apagar a conta, contacta <a href="mailto:suporte@flowstateapp.pt" style={{ color: 'var(--accent)' }}>suporte@flowstateapp.pt</a>.
         </div>
       </div>
     </div>

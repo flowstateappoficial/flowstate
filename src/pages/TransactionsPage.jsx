@@ -9,6 +9,7 @@ export default function TransactionsPage({ txs, txsWithRules, currentPeriod, set
   const [previewTxs, setPreviewTxs] = useState([]);
   const [showPreview, setShowPreview] = useState(false);
   const [importSummary, setImportSummary] = useState(null);
+  const [importError, setImportError] = useState(null);
   const [catDropOpen, setCatDropOpen] = useState(null);
   const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
   const donutRef = useRef(null);
@@ -77,6 +78,20 @@ export default function TransactionsPage({ txs, txsWithRules, currentPeriod, set
   const handleFile = (file) => {
     if (!file) return;
     setImportSummary(null);
+    setImportError(null);
+
+    // Validar extensão antes de processar — evita silêncio quando o utilizador
+    // arrasta um PDF, imagem, ou outro formato qualquer não suportado.
+    const name = file.name.toLowerCase();
+    const ok = /\.(csv|xlsx|xls)$/.test(name);
+    if (!ok) {
+      const ext = name.match(/\.[a-z0-9]+$/)?.[0] || '(sem extensão)';
+      setImportError(`Formato ${ext} não suportado. Aceitamos apenas CSV ou Excel (.xlsx, .xls). Exporta o extrato bancário num desses formatos.`);
+      // Limpa o input para que voltar a seleccionar o mesmo ficheiro dispare onChange
+      if (fileRef.current) fileRef.current.value = '';
+      return;
+    }
+
     if (file.name.toLowerCase().match(/\.xlsx?$/)) {
       const r = new FileReader();
       r.onload = (e) => {
@@ -239,6 +254,22 @@ export default function TransactionsPage({ txs, txsWithRules, currentPeriod, set
           <span style={{ fontSize: 11, color: 'var(--t3)' }}>CSV ou Excel (.xlsx) do teu banco</span>
           <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={e => handleFile(e.target.files[0])} />
         </div>
+
+        {importError && (
+          <div style={{
+            marginTop: 10, padding: '12px 14px', borderRadius: 10,
+            background: 'rgba(229,57,53,.08)', border: '1px solid rgba(229,57,53,.25)',
+            display: 'flex', gap: 10, alignItems: 'flex-start'
+          }}>
+            <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--red-soft)', marginBottom: 3 }}>Ficheiro não suportado</div>
+              <div style={{ fontSize: 12, color: 'var(--t2)', lineHeight: 1.5 }}>{importError}</div>
+            </div>
+            <button onClick={() => setImportError(null)} aria-label="Fechar"
+              style={{ background: 'transparent', border: 'none', color: 'var(--t3)', fontSize: 16, cursor: 'pointer', padding: 2 }}>×</button>
+          </div>
+        )}
 
         {showPreview && previewTxs.length > 0 && (
           <div style={{ marginTop: 12 }}>
