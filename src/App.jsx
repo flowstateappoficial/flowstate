@@ -31,6 +31,7 @@ import OnboardingOverlay from './components/OnboardingOverlay';
 import AppTour from './components/AppTour';
 import PaywallOverlay from './components/PaywallOverlay';
 import LegalOverlay from './components/LegalOverlay';
+import PasswordResetOverlay from './components/PasswordResetOverlay';
 import { updateStreak, evaluateBadges } from './utils/gamification';
 import { evaluateNotifications, evaluateTrialNotifications, loadNotifications, loadReadIds, markAllRead as markAllReadUtil } from './utils/notifications';
 import NotificationCenter from './components/NotificationCenter';
@@ -91,6 +92,10 @@ export default function App() {
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [paywallTab, setPaywallTab] = useState('');
   const [legalOpen, setLegalOpen] = useState(null);
+  // Overlay de definir nova password — disparado quando o utilizador volta
+  // do email de "Esqueceste-te da password?" (Supabase emite o evento
+  // PASSWORD_RECOVERY após processar o token na URL).
+  const [passwordRecoveryOpen, setPasswordRecoveryOpen] = useState(false);
   const [billingAnual, setBillingAnual] = useState(false);
 
   // ── GAMIFICATION ──
@@ -383,6 +388,13 @@ export default function App() {
 
     // 1) Listener primeiro — nunca pode perder um evento.
     const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // Utilizador clicou no link "Esqueceste-te da password?" e voltou
+        // do email. Abre o overlay para definir nova password antes de
+        // qualquer outra navegação.
+        setPasswordRecoveryOpen(true);
+        return;
+      }
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session?.user) {
         applySession(session.user);
       } else if (event === 'SIGNED_OUT') {
@@ -1161,6 +1173,13 @@ export default function App() {
           tipo={legalOpen}
           onClose={() => setLegalOpen(null)}
         />
+      )}
+
+      {/* Password Recovery Overlay — abre quando o utilizador volta do
+          email "Esqueceste-te da password?". Bloqueia toda a UI até a
+          nova password ser definida. */}
+      {passwordRecoveryOpen && (
+        <PasswordResetOverlay onDone={() => setPasswordRecoveryOpen(false)} />
       )}
 
       {/* Referral Invite Modal */}

@@ -17,6 +17,9 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
   // Ecrã dedicado pós-registo a pedir para verificar o email
   // (em vez de mostrar mensagem vermelha no formulário).
   const [pendingEmailVerification, setPendingEmailVerification] = useState(null);
+  // Flow de recuperação de password: 'idle' | 'asking' | 'sent'
+  const [forgotState, setForgotState] = useState('idle');
+  const [forgotError, setForgotError] = useState('');
 
   // Captura convite da URL (/convite/:code) se existir no localStorage.
   React.useEffect(() => {
@@ -137,6 +140,104 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
       await sb.auth.resend({ type: 'signup', email: pendingEmailVerification });
     } catch {}
   };
+
+  // Recuperação de password: envia email com link.
+  // O Supabase usa o template "Reset Password" que configurámos.
+  // O redirectTo traz o utilizador de volta à app com sessão temporária; o
+  // App.jsx detecta o evento PASSWORD_RECOVERY e abre o overlay para
+  // definir nova password.
+  const handleForgotSubmit = async () => {
+    setForgotError('');
+    if (!email) { setForgotError('Indica o teu e-mail.'); return; }
+    const sb = getSupabaseClient();
+    if (!sb) { setForgotError('Erro de ligação. Recarrega a página.'); return; }
+    setLoading(true);
+    try {
+      const { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/',
+      });
+      if (error) {
+        setForgotError(error.message || 'Não foi possível enviar o email.');
+      } else {
+        setForgotState('sent');
+      }
+    } catch (e) {
+      setForgotError(e.message || 'Erro inesperado.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── ECRÃ DEDICADO: recuperação de password ──
+  if (forgotState !== 'idle') {
+    const sent = forgotState === 'sent';
+    return (
+      <div id="page-auth-forgot" style={{ minHeight: '100vh', background: '#141829', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '1rem' : '2rem', fontFamily: 'Inter,system-ui,sans-serif' }}>
+        <div style={{ marginBottom: '0.3rem', textAlign: 'center' }}>
+          <img src={logo} alt="Flowstate" style={{ height: isMobile ? 140 : 200, width: 'auto', display: 'block', margin: '0 auto' }} />
+        </div>
+        <div style={{ width: '100%', maxWidth: 440, background: '#202638', borderRadius: 20, padding: isMobile ? '2rem 1.5rem' : '2.5rem 2rem', boxShadow: '0 24px 64px rgba(0,0,0,.5)' }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: '50%',
+            background: sent ? 'rgba(0,215,100,.1)' : 'rgba(123,127,255,.1)',
+            border: '1px solid ' + (sent ? 'rgba(0,215,100,.25)' : 'rgba(123,127,255,.25)'),
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 28, margin: '0 auto 1.25rem',
+          }}>{sent ? '📬' : '🔑'}</div>
+
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 .75rem', letterSpacing: '-.01em', textAlign: 'center' }}>
+            {sent ? 'Verifica o teu e-mail' : 'Recuperar password'}
+          </h2>
+
+          {sent ? (
+            <>
+              <p style={{ fontSize: 14, color: '#b8bfda', lineHeight: 1.6, margin: '0 0 .5rem', textAlign: 'center' }}>
+                Enviámos um link de recuperação para
+              </p>
+              <p style={{ fontSize: 15, color: '#00D764', fontWeight: 700, margin: '0 0 1.5rem', wordBreak: 'break-all', textAlign: 'center' }}>
+                {email}
+              </p>
+              <div style={{ padding: '14px 16px', borderRadius: 12, background: 'rgba(0,215,100,.06)', border: '1px solid rgba(0,215,100,.15)', marginBottom: '1.5rem' }}>
+                <div style={{ fontSize: 12, color: '#b8bfda', lineHeight: 1.6 }}>
+                  <strong style={{ color: '#fff' }}>Próximo passo:</strong> abre o e-mail e carrega no link "Definir nova password". Vais voltar automaticamente para esta página com um campo para escreveres a nova password.
+                </div>
+              </div>
+              <p style={{ fontSize: 12, color: '#6e7491', lineHeight: 1.6, margin: '0 0 1.25rem', textAlign: 'center' }}>
+                Não chegou em 1-2 minutos? Verifica a pasta de spam.
+              </p>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 14, color: '#b8bfda', lineHeight: 1.6, margin: '0 0 1.25rem', textAlign: 'center' }}>
+                Indica o e-mail da tua conta. Enviamos um link para definires uma nova password.
+              </p>
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#6e7491', marginBottom: 6 }}>E-mail</label>
+                <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="o.teu@email.com"
+                  onKeyDown={e => { if (e.key === 'Enter') handleForgotSubmit(); }}
+                  autoFocus
+                  style={{ width: '100%', height: 42, padding: '0 14px', background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, fontSize: 14, color: '#fff', fontFamily: 'Inter,sans-serif', outline: 'none' }} />
+              </div>
+              {forgotError && (
+                <div style={{ background: 'rgba(229,57,53,.15)', border: '1px solid rgba(229,57,53,.3)', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#ff6b6b', marginBottom: '1rem' }}>
+                  {forgotError}
+                </div>
+              )}
+              <button onClick={handleForgotSubmit} disabled={loading}
+                style={{ width: '100%', padding: 13, borderRadius: 12, background: '#00D764', color: '#000', border: 'none', fontFamily: 'Inter,sans-serif', fontSize: 14, fontWeight: 800, cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1, marginBottom: '1rem', boxShadow: '0 0 30px rgba(0,215,100,.25)' }}>
+                {loading ? 'A enviar…' : 'Enviar link de recuperação'}
+              </button>
+            </>
+          )}
+
+          <button onClick={() => { setForgotState('idle'); setForgotError(''); }}
+            style={{ width: '100%', padding: 13, borderRadius: 12, background: 'rgba(255,255,255,.06)', color: '#fff', border: '1px solid rgba(255,255,255,.1)', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'Inter,sans-serif' }}>
+            Voltar ao login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ── ECRÃ DEDICADO: verificação de email pós-registo ──
   if (pendingEmailVerification) {
@@ -260,7 +361,15 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
         </div>
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#6e7491', marginBottom: 6 }}>Password</label>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
+            <label style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#6e7491' }}>Password</label>
+            {mode === 'login' && (
+              <button onClick={() => { setForgotState('asking'); setForgotError(''); }}
+                style={{ background: 'none', border: 'none', color: '#00D764', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'Inter,sans-serif', padding: 0, textDecoration: 'underline' }}>
+                Esqueceste-te?
+              </button>
+            )}
+          </div>
           <input value={pass} onChange={e => setPass(e.target.value)} type="password" placeholder="••••••••"
             onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
             style={{ width: '100%', height: 42, padding: '0 14px', background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, fontSize: 14, color: '#fff', fontFamily: 'Inter,sans-serif', outline: 'none' }} />
