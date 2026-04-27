@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 
-const COLORS = ['#00D764', '#7b7fff', '#f7931a', '#00b4d8', '#e53935'];
+const COLORS = [
+  '#00D764', '#06d6a0', '#0ead69',
+  '#00b4d8', '#3a86ff', '#7b7fff',
+  '#ff6b9d', '#e63946', '#e53935',
+  '#f7931a', '#ffd60a', '#fcbf49',
+  '#9d4edd', '#6e7491', '#1d3557',
+];
 
 export default function GoalModal({ editId, objetivos, onClose, onSave, onDelete }) {
   const [nome, setNome] = useState('');
@@ -51,7 +57,7 @@ export default function GoalModal({ editId, objetivos, onClose, onSave, onDelete
         </div>
         <div className="form-field">
           <label>Cor</label>
-          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
             {COLORS.map(c => (
               <div key={c} onClick={() => setCor(c)} style={{
                 width: 24, height: 24, borderRadius: '50%', background: c, cursor: 'pointer',

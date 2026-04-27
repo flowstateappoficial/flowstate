@@ -606,7 +606,26 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
                       </strong>
                     </span>
                   )}
+                  {a.meta && a.meta > 0 && (
+                    <span>Meta: <strong style={{ color: 'var(--t2)' }}>{fmtV(a.meta)}</strong></span>
+                  )}
                 </div>
+
+                {/* Barra de progresso da meta — só aparece se o utilizador definiu uma */}
+                {a.meta && a.meta > 0 && (() => {
+                  const pctMeta = Math.min(100, Math.round((val / a.meta) * 100));
+                  return (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--t3)', marginBottom: 3 }}>
+                        <span>Progresso da meta</span>
+                        <strong style={{ color: pctMeta >= 100 ? 'var(--accent)' : 'var(--t2)' }}>{pctMeta}%</strong>
+                      </div>
+                      <div style={{ height: 6, background: 'rgba(255,255,255,.06)', borderRadius: 3 }}>
+                        <div style={{ width: pctMeta + '%', height: '100%', background: cor, borderRadius: 3, transition: 'width .8s' }} />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div style={{ height: 3, background: 'rgba(255,255,255,.06)', borderRadius: 2, marginTop: 10 }}>
                   <div style={{ width: pctDoMes + '%', height: '100%', background: cor, borderRadius: 2, transition: 'width .8s' }} />

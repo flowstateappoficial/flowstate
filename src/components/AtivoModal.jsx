@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { saveAtivoToSupabase, saveAtivoEntry } from '../utils/supabase';
 
-const COLORS = ['#00D764', '#7b7fff', '#f7931a', '#00b4d8', '#e53935', '#ffd60a'];
+const COLORS = [
+  '#00D764', '#06d6a0', '#0ead69',
+  '#00b4d8', '#3a86ff', '#7b7fff',
+  '#ff6b9d', '#e63946', '#e53935',
+  '#f7931a', '#ffd60a', '#fcbf49',
+  '#9d4edd', '#6e7491', '#1d3557',
+];
 const TIPOS = ['ETF', 'PPR', 'Ação', 'Crypto', 'Obrigação', 'Imobiliário', 'Outro'];
 
 export default function AtivoModal({ editId, ativos, ativoEntries, invMonth, currentUser, saveAtivosLocal, updateAtivoEntries, onClose, onReload }) {
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState('ETF');
   const [valor, setValor] = useState('');
+  const [meta, setMeta] = useState('');
   const [notas, setNotas] = useState('');
   const [cor, setCor] = useState('#00D764');
   const [saving, setSaving] = useState(false);
@@ -17,18 +24,19 @@ export default function AtivoModal({ editId, ativos, ativoEntries, invMonth, cur
       const a = ativos.find(x => String(x.id) === String(editId));
       if (a) {
         setNome(a.nome); setTipo(a.tipo); setCor(a.cor || '#00D764'); setNotas(a.notas || '');
+        setMeta(a.meta && a.meta > 0 ? a.meta : '');
         const val = (ativoEntries[editId] || {})[invMonth] || '';
         setValor(val);
       }
     } else {
-      setNome(''); setTipo('ETF'); setValor(''); setNotas(''); setCor('#00D764');
+      setNome(''); setTipo('ETF'); setValor(''); setMeta(''); setNotas(''); setCor('#00D764');
     }
   }, [editId, ativos, ativoEntries, invMonth]);
 
   const handleSave = async () => {
     if (!nome) return;
     setSaving(true);
-    const obj = { id: editId || null, nome, tipo, cor, notas };
+    const obj = { id: editId || null, nome, tipo, cor, notas, meta: parseFloat(meta) || 0 };
     let savedId = obj.id;
 
     if (currentUser) {
@@ -79,6 +87,13 @@ export default function AtivoModal({ editId, ativos, ativoEntries, invMonth, cur
           <div className="form-field">
             <label>Valor neste mês (€)</label>
             <input type="number" value={valor} onChange={e => setValor(e.target.value)} placeholder="0.00" min="0" step="10" />
+          </div>
+        </div>
+        <div className="form-field">
+          <label>Meta de valor (€) — opcional</label>
+          <input type="number" value={meta} onChange={e => setMeta(e.target.value)} placeholder="Ex: 10000" min="0" step="100" />
+          <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4 }}>
+            Quanto queres que este ativo valha. Mostra barra de progresso. Deixa vazio se não quiseres definir meta.
           </div>
         </div>
         <div className="form-field">

@@ -105,7 +105,7 @@ export async function loadInvestmentsFromSupabase(userId) {
       sb.from('fundo_contribs').select('*').eq('user_id', userId)
     ]);
     const ativos = (!resDefs.error && resDefs.data)
-      ? resDefs.data.map(r => ({ id: r.id, nome: r.name, tipo: r.type, cor: r.color || '#00D764', notas: r.notes || '' }))
+      ? resDefs.data.map(r => ({ id: r.id, nome: r.name, tipo: r.type, cor: r.color || '#00D764', notas: r.notes || '', meta: parseFloat(r.target_amount) || 0 }))
       : null;
     const ativoEntries = {};
     if (!resEntries.error && resEntries.data) {
@@ -145,7 +145,7 @@ export async function saveAtivoToSupabase(obj, userId) {
   const sb = getSupabaseClient();
   if (!sb || !userId) return null;
   try {
-    const row = { user_id: userId, name: obj.nome, type: obj.tipo, color: obj.cor, notes: obj.notas };
+    const row = { user_id: userId, name: obj.nome, type: obj.tipo, color: obj.cor, notes: obj.notas, target_amount: parseFloat(obj.meta) || 0 };
     if (obj.id && typeof obj.id === 'string' && obj.id.includes('-')) {
       const { data, error } = await sb.from('investments').update(row).eq('id', obj.id).eq('user_id', userId).select('id').single();
       if (!error && data) return data.id;
