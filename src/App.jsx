@@ -734,7 +734,18 @@ export default function App() {
     return { value: 0, meta: 0 };
   }, [feEntries]);
 
-  const getAtivoValueForMonth = useCallback((id, ym) => (ativoEntries[id] || {})[ym] || 0, [ativoEntries]);
+  // Valor de mercado de um ativo num mês. Se não houver entrada específica
+  // para esse mês, propaga o valor do mês mais recente anterior (carry-forward).
+  // Assim quando viras de página para um mês novo, o valor herda do anterior até
+  // o utilizador o ajustar (reforçar / retirar / atualizar valor de mercado).
+  const getAtivoValueForMonth = useCallback((id, ym) => {
+    const entries = ativoEntries[id] || {};
+    if (entries[ym] !== undefined) return entries[ym];
+    const meses = Object.keys(entries).sort();
+    let ultimo = null;
+    for (const mes of meses) { if (mes <= ym) ultimo = mes; }
+    return ultimo ? (entries[ultimo] || 0) : 0;
+  }, [ativoEntries]);
   const getTotalInvestidoForMonth = useCallback((ym) => ativos.reduce((s, a) => s + getAtivoValueForMonth(a.id, ym), 0), [ativos, getAtivoValueForMonth]);
   const getPatrimonioForMonth = useCallback((ym) => getFeForMonth(ym).value + getTotalInvestidoForMonth(ym), [getFeForMonth, getTotalInvestidoForMonth]);
 
