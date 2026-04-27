@@ -3,23 +3,21 @@ import useIsMobile from '../hooks/useIsMobile';
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, DoughnutController, ArcElement, Tooltip } from 'chart.js';
 import { PT_M, PT_MESES, TIPO_COLORS } from '../utils/constants';
 import { txsComRegra } from '../utils/helpers';
-import { saveFundoEmergencia, saveAtivoEntry, saveAtivoContrib, deleteAtivoFromSupabase } from '../utils/supabase';
+import { saveFundoEmergencia, saveFundoContrib, saveAtivoEntry, saveAtivoContrib, deleteAtivoFromSupabase } from '../utils/supabase';
 import InvestmentsTutorial from '../components/InvestmentsTutorial';
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, DoughnutController, ArcElement, Tooltip);
 
 const INV_TUTORIAL_KEY = 'fs_inv_tutorial_seen_v1';
 
-export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, feEntries, invMonth, setInvMonth, txsWithRules, currentUser, getFeForMonth, getAtivoValueForMonth, getAtivoInvestidoForMonth, getAtivoValorizacaoForMonth, getAtivoRendimentoPctForMonth, getTotalInvestidoForMonth, getPatrimonioForMonth, feMetaGlobal, updateFeEntries, updateAtivoEntries, updateAtivoContribs, saveAtivosLocal, onAddAtivo, onEditAtivo, fmtV, getCurrentMonth, calcOpen, onToggleCalc }) {
+export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, feEntries, feContribs, invMonth, setInvMonth, txsWithRules, currentUser, getFeForMonth, getAtivoValueForMonth, getAtivoInvestidoForMonth, getAtivoValorizacaoForMonth, getAtivoRendimentoPctForMonth, getFeInvestidoForMonth, getFeValorizacaoForMonth, getFeRendimentoPctForMonth, getTotalInvestidoForMonth, getPatrimonioForMonth, feMetaGlobal, updateFeEntries, updateFeContribs, updateAtivoEntries, updateAtivoContribs, saveAtivosLocal, onAddAtivo, onEditAtivo, fmtV, getCurrentMonth, calcOpen, onToggleCalc }) {
   const isMobile = useIsMobile();
   const patrimonioRef = useRef(null);
   const patrimonioChartRef = useRef(null);
   const donutRef = useRef(null);
   const donutChartRef = useRef(null);
   const [feEditMeta, setFeEditMeta] = useState(false);
-  const [feEditVal, setFeEditVal] = useState(false);
   const [feMetaInput, setFeMetaInput] = useState('');
-  const [feValInput, setFeValInput] = useState('');
   const [monthMenuOpen, setMonthMenuOpen] = useState(false);
   const monthMenuRef = useRef(null);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -119,12 +117,36 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
   }, [ativos, ativoEntries, feEntries, invMonth]);
 
   // Fundo helpers
+  // Garante que existe pelo menos uma contribuição registada para o FE. Se for
+  // legacy (FE com valor mas sem contribs), faz backfill: a primeira
+  // contribuição fica igual ao valor do primeiro mês registado.
+  const ensureFeContribsBackfilled = () => {
+    if (Object.keys(feContribs || {}).length > 0) return feContribs || {};
+    const meses = Object.keys(feEntries).sort();
+    if (meses.length === 0) return {};
+    const primeiro = meses[0];
+    return { [primeiro]: (feEntries[primeiro]?.value) || 0 };
+  };
+
   const handleReforcar = async () => {
     const valor = parseFloat(prompt('Quanto queres adicionar ao Fundo de Emergência? (€)'));
     if (!valor || isNaN(valor) || valor <= 0) return;
+
+    const baseContribs = ensureFeContribsBackfilled();
+    const novoContribMes = (baseContribs[invMonth] || 0) + valor;
+    const newContribs = { ...feContribs, ...baseContribs, [invMonth]: novoContribMes };
+    updateFeContribs(newContribs);
+    if (currentUser) {
+      saveFundoContrib(invMonth, novoContribMes, currentUser.id);
+      if (Object.keys(feContribs || {}).length === 0) {
+        const primeiro = Object.keys(baseContribs).find(m => m !== invMonth);
+        if (primeiro) saveFundoContrib(primeiro, baseContribs[primeiro], currentUser.id);
+      }
+    }
+
     const newEntries = { ...feEntries };
     if (!newEntries[invMonth]) newEntries[invMonth] = { value: fe.value, meta: metaGlobal };
-    newEntries[invMonth].value = (newEntries[invMonth].value || 0) + valor;
+    newEntries[invMonth] = { ...newEntries[invMonth], value: (newEntries[invMonth].value || 0) + valor };
     updateFeEntries(newEntries);
     if (currentUser) saveFundoEmergencia(invMonth, newEntries[invMonth].value, newEntries[invMonth].meta, currentUser.id);
   };
@@ -132,21 +154,35 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
   const handleRetirar = async () => {
     const valor = parseFloat(prompt('Quanto queres retirar do Fundo de Emergência? (€)'));
     if (!valor || isNaN(valor) || valor <= 0) return;
+
+    const baseContribs = ensureFeContribsBackfilled();
+    const novoContribMes = (baseContribs[invMonth] || 0) - valor;
+    const newContribs = { ...feContribs, ...baseContribs, [invMonth]: novoContribMes };
+    updateFeContribs(newContribs);
+    if (currentUser) {
+      saveFundoContrib(invMonth, novoContribMes, currentUser.id);
+      if (Object.keys(feContribs || {}).length === 0) {
+        const primeiro = Object.keys(baseContribs).find(m => m !== invMonth);
+        if (primeiro) saveFundoContrib(primeiro, baseContribs[primeiro], currentUser.id);
+      }
+    }
+
     const newEntries = { ...feEntries };
     if (!newEntries[invMonth]) newEntries[invMonth] = { value: fe.value, meta: metaGlobal };
-    newEntries[invMonth].value = Math.max(0, (newEntries[invMonth].value || 0) - valor);
+    newEntries[invMonth] = { ...newEntries[invMonth], value: Math.max(0, (newEntries[invMonth].value || 0) - valor) };
     updateFeEntries(newEntries);
     if (currentUser) saveFundoEmergencia(invMonth, newEntries[invMonth].value, newEntries[invMonth].meta, currentUser.id);
   };
 
-  const handleSaveFeVal = async () => {
-    const val = parseFloat(feValInput) || 0;
+  const handleAtualizarValorFE = async () => {
+    const novoStr = prompt(`Qual o valor atual do Fundo de Emergência? (€)\nValor registado: ${fe.value.toLocaleString('pt-PT')} €\n\nUsa este botão quando os juros credidos pelo banco/produto fizerem o valor mexer. Para depositar ou levantar dinheiro teu, usa + Reforçar / − Retirar.`);
+    const novo = parseFloat(novoStr);
+    if (novoStr === null || isNaN(novo) || novo < 0) return;
     const newEntries = { ...feEntries };
     if (!newEntries[invMonth]) newEntries[invMonth] = { value: 0, meta: metaGlobal };
-    newEntries[invMonth].value = val;
+    newEntries[invMonth] = { ...newEntries[invMonth], value: novo };
     updateFeEntries(newEntries);
-    if (currentUser) saveFundoEmergencia(invMonth, val, newEntries[invMonth].meta, currentUser.id);
-    setFeEditVal(false);
+    if (currentUser) saveFundoEmergencia(invMonth, novo, newEntries[invMonth].meta, currentUser.id);
   };
 
   const handleSaveFeMeta = async () => {
@@ -386,13 +422,34 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
                 <div className="card-title" style={{ margin: 0 }}>🛡️ Fundo de Emergência — {invMonth}</div>
                 <button onClick={() => { setFeEditMeta(!feEditMeta); setFeMetaInput(metaEfetiva); }} style={{ fontSize: 11, color: 'var(--t3)', background: 'rgba(255,255,255,.06)', border: 'none', borderRadius: 7, padding: '5px 10px', cursor: 'pointer', fontFamily: 'var(--font)' }}>✏️ Editar meta</button>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '.5rem' }}>
                 <div>
                   <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--t1)', letterSpacing: '-.04em' }}>{fmtV(fe.value)}</div>
                   <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 2 }}>de {fmtV(metaEfetiva)} meta</div>
                 </div>
                 <div style={{ fontSize: '2rem', fontWeight: 800, color: pctFe >= 100 ? 'var(--accent)' : pctFe >= 50 ? '#f7931a' : 'var(--red-soft)' }}>{pctFe}%</div>
               </div>
+
+              {/* Valorização do FE (juros, rendimento de produto) */}
+              {(() => {
+                const feInv = getFeInvestidoForMonth(invMonth);
+                const feVal = getFeValorizacaoForMonth(invMonth);
+                const feRend = getFeRendimentoPctForMonth(invMonth);
+                if (feRend !== null && feInv > 0 && Math.abs(feVal) >= 0.01) {
+                  const positive = feVal >= 0;
+                  return (
+                    <div style={{ fontSize: 11, color: positive ? 'var(--accent)' : 'var(--red-soft)', fontWeight: 700, marginBottom: 4 }}>
+                      {positive ? '↑' : '↓'} {positive ? '+' : ''}{feRend.toFixed(2)}% ({positive ? '+' : ''}{fmtV(feVal)}) desde início
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              <div style={{ fontSize: 10, color: 'var(--t3)', marginBottom: '.75rem' }}>
+                Investido: <strong style={{ color: 'var(--t2)' }}>{fmtV(getFeInvestidoForMonth(invMonth))}</strong>
+              </div>
+
               <div className="bar-bg" style={{ height: 8, marginBottom: '.75rem' }}><div style={{ height: '100%', width: pctFe + '%', background: 'var(--accent)', borderRadius: 4, transition: 'width 1s' }} /></div>
 
               {feEditMeta && (
@@ -406,16 +463,8 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0,1fr) minmax(0,1fr)' : 'minmax(0,1fr) minmax(0,1fr) auto', gap: 8 }}>
                 <button onClick={handleReforcar} style={{ padding: 11, borderRadius: 9, background: 'var(--accent)', color: '#000', border: 'none', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>+ Reforçar</button>
                 <button onClick={handleRetirar} style={{ padding: 11, borderRadius: 9, background: 'rgba(229,57,53,.15)', color: 'var(--red-soft)', border: '1px solid rgba(229,57,53,.25)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>− Retirar</button>
-                <button onClick={() => { setFeEditVal(!feEditVal); setFeValInput(fe.value); }} style={{ padding: '11px 14px', borderRadius: 9, background: 'rgba(255,255,255,.06)', color: 'var(--t3)', border: 'none', fontFamily: 'var(--font)', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>✏️ Editar</button>
+                <button onClick={handleAtualizarValorFE} title="Atualizar com o saldo que o banco/produto mostra (juros, rendimento)" style={{ padding: '11px 14px', borderRadius: 9, background: 'rgba(123,127,255,.12)', color: '#7b7fff', border: '1px solid rgba(123,127,255,.25)', fontFamily: 'var(--font)', fontSize: 11, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>💰 Valor atual</button>
               </div>
-
-              {feEditVal && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <input type="number" value={feValInput} onChange={e => setFeValInput(e.target.value)} placeholder="Valor total (€)" min="0" step="100"
-                    style={{ flex: 1, background: 'rgba(255,255,255,.07)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', color: 'var(--t1)', fontFamily: 'var(--font)', fontSize: 14, fontWeight: 600, outline: 'none' }} />
-                  <button onClick={handleSaveFeVal} style={{ padding: '8px 16px', borderRadius: 8, background: 'var(--accent)', color: '#000', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>Guardar</button>
-                </div>
-              )}
             </>
           )}
         </div>

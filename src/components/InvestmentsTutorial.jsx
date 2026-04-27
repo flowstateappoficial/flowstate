@@ -35,7 +35,7 @@ const SLIDES = [
     emoji: '✅',
     titulo: 'Pronto a começar',
     texto: 'Adiciona o teu primeiro ativo e regista os 3 tipos de acção sempre que fizeres uma mexida. Em qualquer momento podes reabrir este guia no botão "ℹ️ Como funciona?".',
-    highlight: null,
+    highlight: 'Os mesmos 3 botões aplicam-se ao Fundo de Emergência — útil se o tiveres num depósito a prazo ou conta poupança que rende juros.',
   },
 ];
 

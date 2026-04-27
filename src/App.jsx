@@ -70,6 +70,7 @@ export default function App() {
   const [ativoEntries, setAtivoEntries] = useState({});      // id -> { ym: valor de mercado }
   const [ativoContribs, setAtivoContribs] = useState({});    // id -> { ym: contribuição líquida (+/-) }
   const [feEntries, setFeEntries] = useState({});
+  const [feContribs, setFeContribs] = useState({});          // ym -> contribuição líquida do FE (+/-)
   const [invMonth, setInvMonth] = useState(getCurrentMonth());
   const [invDataLoaded, setInvDataLoaded] = useState(false);
 
@@ -306,7 +307,7 @@ export default function App() {
     const keysToRemove = [
       LS_TXS, LS_OBJ, LS_ATIVOS, LS_FE, LS_RULES, LS_PLAN,
       LS_BUDGET, LS_RENDIMENTO,
-      'fs_dash_prefs_v1', 'fs_inv_entries_v1', 'fs_inv_contribs_v1',
+      'fs_dash_prefs_v1', 'fs_inv_entries_v1', 'fs_inv_contribs_v1', 'fs_fe_contribs_v1',
       'fs_streak_v1', 'fs_badges_v1',
       'fs_notifications_v1', 'fs_notifications_read_v1',
       'fs_pending_referral_code', 'fs_referral_cache_v2',
@@ -314,7 +315,7 @@ export default function App() {
       'fuga_meta_v1',
     ];
     keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch {} });
-    setTxs([]); setObjetivos([]); setAtivos([]); setAtivoEntries({}); setAtivoContribs({}); setFeEntries({});
+    setTxs([]); setObjetivos([]); setAtivos([]); setAtivoEntries({}); setAtivoContribs({}); setFeEntries({}); setFeContribs({});
     setBudget({}); setRendimentoMensal(0); setUserRules([]);
     setDashPrefs({ visible: ['hero','performance','budget','goals','subscriptions','gamification'] });
     setStreak({ current: 0, best: 0, lastDate: null }); setBadges([]);
@@ -478,11 +479,13 @@ export default function App() {
         setAtivoEntries(data.ativoEntries || {});
         setAtivoContribs(data.ativoContribs || {});
         setFeEntries(data.feEntries || {});
+        setFeContribs(data.feContribs || {});
         try {
           localStorage.setItem(LS_ATIVOS, JSON.stringify(data.ativos || []));
           localStorage.setItem('fs_inv_entries_v1', JSON.stringify(data.ativoEntries || {}));
           localStorage.setItem('fs_inv_contribs_v1', JSON.stringify(data.ativoContribs || {}));
           localStorage.setItem(LS_FE, JSON.stringify(data.feEntries || {}));
+          localStorage.setItem('fs_fe_contribs_v1', JSON.stringify(data.feContribs || {}));
         } catch {}
       } else {
         // Fallback to localStorage
@@ -490,6 +493,7 @@ export default function App() {
         try { const d = localStorage.getItem('fs_inv_entries_v1'); if (d) setAtivoEntries(JSON.parse(d)); } catch {}
         try { const d = localStorage.getItem('fs_inv_contribs_v1'); if (d) setAtivoContribs(JSON.parse(d)); } catch {}
         try { const d = localStorage.getItem(LS_FE); if (d) setFeEntries(JSON.parse(d)); } catch {}
+        try { const d = localStorage.getItem('fs_fe_contribs_v1'); if (d) setFeContribs(JSON.parse(d)); } catch {}
       }
       setInvDataLoaded(true);
     }).catch(() => {
@@ -497,6 +501,7 @@ export default function App() {
       try { const d = localStorage.getItem('fs_inv_entries_v1'); if (d) setAtivoEntries(JSON.parse(d)); } catch {}
       try { const d = localStorage.getItem('fs_inv_contribs_v1'); if (d) setAtivoContribs(JSON.parse(d)); } catch {}
       try { const d = localStorage.getItem(LS_FE); if (d) setFeEntries(JSON.parse(d)); } catch {}
+      try { const d = localStorage.getItem('fs_fe_contribs_v1'); if (d) setFeContribs(JSON.parse(d)); } catch {}
       setInvDataLoaded(true);
     });
 
@@ -747,6 +752,30 @@ export default function App() {
     if (inv <= 0) return null;
     return (getAtivoValorizacaoForMonth(id, ym) / inv) * 100;
   }, [getAtivoInvestidoForMonth, getAtivoValorizacaoForMonth]);
+
+  // ── FE INVESTIDO/VALORIZAÇÃO ──
+  // Mesmo modelo dos ativos: se ainda não há contribuições registadas mas há
+  // valor no FE, modo legacy → investido = valor (sem valorização). A primeira
+  // contribuição faz backfill e a partir daí o cálculo passa a real.
+  const getFeInvestidoForMonth = useCallback((ym) => {
+    const meses = Object.keys(feContribs);
+    if (meses.length === 0) {
+      return getFeForMonth(ym).value;
+    }
+    let total = 0;
+    for (const mes of meses) { if (mes <= ym) total += feContribs[mes] || 0; }
+    return Math.max(0, total);
+  }, [feContribs, getFeForMonth]);
+
+  const getFeValorizacaoForMonth = useCallback((ym) => {
+    return getFeForMonth(ym).value - getFeInvestidoForMonth(ym);
+  }, [getFeForMonth, getFeInvestidoForMonth]);
+
+  const getFeRendimentoPctForMonth = useCallback((ym) => {
+    const inv = getFeInvestidoForMonth(ym);
+    if (inv <= 0) return null;
+    return (getFeValorizacaoForMonth(ym) / inv) * 100;
+  }, [getFeInvestidoForMonth, getFeValorizacaoForMonth]);
   
   const feMetaGlobal = useCallback(() => {
     const meses = Object.keys(feEntries).sort();
@@ -767,6 +796,11 @@ export default function App() {
   const updateAtivoContribs = useCallback((newContribs) => {
     setAtivoContribs(newContribs);
     try { localStorage.setItem('fs_inv_contribs_v1', JSON.stringify(newContribs)); } catch {}
+  }, []);
+
+  const updateFeContribs = useCallback((newContribs) => {
+    setFeContribs(newContribs);
+    try { localStorage.setItem('fs_fe_contribs_v1', JSON.stringify(newContribs)); } catch {}
   }, []);
 
   const saveAtivosLocal = useCallback((newAtivos) => {
@@ -882,6 +916,7 @@ export default function App() {
             ativoEntries={ativoEntries}
             ativoContribs={ativoContribs}
             feEntries={feEntries}
+            feContribs={feContribs}
             invMonth={invMonth}
             setInvMonth={setInvMonth}
             txsWithRules={txsWithRules}
@@ -893,8 +928,12 @@ export default function App() {
             getAtivoRendimentoPctForMonth={getAtivoRendimentoPctForMonth}
             getTotalInvestidoForMonth={getTotalInvestidoForMonth}
             getPatrimonioForMonth={getPatrimonioForMonth}
+            getFeInvestidoForMonth={getFeInvestidoForMonth}
+            getFeValorizacaoForMonth={getFeValorizacaoForMonth}
+            getFeRendimentoPctForMonth={getFeRendimentoPctForMonth}
             feMetaGlobal={feMetaGlobal}
             updateFeEntries={updateFeEntries}
+            updateFeContribs={updateFeContribs}
             updateAtivoEntries={updateAtivoEntries}
             updateAtivoContribs={updateAtivoContribs}
             saveAtivosLocal={saveAtivosLocal}

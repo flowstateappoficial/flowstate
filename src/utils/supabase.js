@@ -97,11 +97,12 @@ export async function loadInvestmentsFromSupabase(userId) {
   const sb = getSupabaseClient();
   if (!sb || !userId) return null;
   try {
-    const [resDefs, resEntries, resFe, resContribs] = await Promise.all([
+    const [resDefs, resEntries, resFe, resContribs, resFeContribs] = await Promise.all([
       sb.from('investments').select('*').eq('user_id', userId),
       sb.from('investment_entries').select('*').eq('user_id', userId),
       sb.from('fundo_emergencia').select('*').eq('user_id', userId),
-      sb.from('investment_contribs').select('*').eq('user_id', userId)
+      sb.from('investment_contribs').select('*').eq('user_id', userId),
+      sb.from('fundo_contribs').select('*').eq('user_id', userId)
     ]);
     const ativos = (!resDefs.error && resDefs.data)
       ? resDefs.data.map(r => ({ id: r.id, nome: r.name, tipo: r.type, cor: r.color || '#00D764', notas: r.notes || '' }))
@@ -127,7 +128,13 @@ export async function loadInvestmentsFromSupabase(userId) {
     if (!resFe.error && resFe.data) {
       resFe.data.forEach(r => { feEntries[r.month] = { value: parseFloat(r.value) || 0, meta: parseFloat(r.meta) || 0 }; });
     }
-    return { ativos, ativoEntries, ativoContribs, feEntries };
+    const feContribs = {};
+    if (!resFeContribs.error && resFeContribs.data) {
+      resFeContribs.data.forEach(r => { feContribs[r.month] = parseFloat(r.amount) || 0; });
+    } else if (resFeContribs.error) {
+      console.warn('fundo_contribs:', resFeContribs.error.message);
+    }
+    return { ativos, ativoEntries, ativoContribs, feEntries, feContribs };
   } catch (e) {
     console.warn('loadInvestmentsFromSupabase failed:', e);
     return null;
@@ -183,6 +190,15 @@ export async function saveFundoEmergencia(month, value, meta, userId) {
   if (!sb || !userId) return false;
   try {
     const { error } = await sb.from('fundo_emergencia').upsert([{ user_id: userId, month, value, meta }], { onConflict: 'user_id,month' });
+    return !error;
+  } catch (e) { return false; }
+}
+
+export async function saveFundoContrib(month, amount, userId) {
+  const sb = getSupabaseClient();
+  if (!sb || !userId) return false;
+  try {
+    const { error } = await sb.from('fundo_contribs').upsert([{ user_id: userId, month, amount }], { onConflict: 'user_id,month' });
     return !error;
   } catch (e) { return false; }
 }
