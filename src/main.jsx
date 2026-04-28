@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import { DialogProvider } from './components/Dialog';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import './styles/app.css';
 import { registerSW, initInstallPromptCapture } from './utils/pwa';
 
@@ -15,6 +17,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <ErrorBoundary>
       <DialogProvider>
         <App />
+        <Analytics />
+        <SpeedInsights />
       </DialogProvider>
     </ErrorBoundary>
   </React.StrictMode>
