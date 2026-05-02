@@ -200,6 +200,21 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
     if (novoStr === null) return;
     const novo = parseFloat(String(novoStr).replace(',', '.'));
     if (isNaN(novo) || novo < 0) return;
+
+    // Backfill silencioso: se o FE é legacy (entries existentes mas contribs
+    // vazias), regista o valor anterior como contribuição inicial. Sem isto,
+    // o modo legacy faz "investido = valor atual" sempre, anulando a
+    // valorização — mesmo bug que afetava utilizadores antigos no FE.
+    if (Object.keys(feContribs || {}).length === 0) {
+      const base = ensureFeContribsBackfilled();
+      const primeiro = Object.keys(base)[0];
+      if (primeiro) {
+        const novaBase = { ...feContribs, ...base };
+        updateFeContribs(novaBase);
+        if (currentUser) saveFundoContrib(primeiro, base[primeiro], currentUser.id);
+      }
+    }
+
     const newEntries = { ...feEntries };
     if (!newEntries[invMonth]) newEntries[invMonth] = { value: 0, meta: metaGlobal };
     newEntries[invMonth] = { ...newEntries[invMonth], value: novo };
@@ -318,6 +333,23 @@ export default function InvestmentsPage({ ativos, ativoEntries, ativoContribs, f
     if (novoStr === null) return;
     const novo = parseFloat(String(novoStr).replace(',', '.'));
     if (isNaN(novo) || novo < 0) return;
+
+    // Backfill silencioso: se este ativo é legacy (entries existentes mas
+    // contribs vazias), regista o valor anterior como contribuição inicial.
+    // Sem isto, o modo legacy faz "investido = valor atual" sempre, o que
+    // anula a valorização — bug que afetava utilizadores antigos que clicavam
+    // pela primeira vez em "Valor atual" e não viam a barra mexer.
+    const existingContribs = ativoContribs[ativId] || {};
+    if (Object.keys(existingContribs).length === 0) {
+      const base = ensureContribsBackfilled(ativId, existingContribs);
+      const primeiro = Object.keys(base)[0];
+      if (primeiro) {
+        const novaBase = { ...ativoContribs, [ativId]: base };
+        updateAtivoContribs(novaBase);
+        if (currentUser) saveAtivoContrib(ativId, primeiro, base[primeiro], currentUser.id);
+      }
+    }
+
     await persistEntryForMonth(ativId, invMonth, novo);
   };
 
