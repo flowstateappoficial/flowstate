@@ -3,7 +3,6 @@ import useIsMobile from '../hooks/useIsMobile';
 import { BUDGET_CATS, CC, CB, PT_M, PT_MESES } from '../utils/constants';
 import { txsComRegra } from '../utils/helpers';
 import { getDicaDoDia } from '../utils/dicas';
-import GamificationCard from '../components/GamificationCard';
 import SubscriptionsCard from '../components/SubscriptionsCard';
 import { openReportInNewTab, openReportPreviewInNewTab } from '../utils/reportGenerator';
 import ReportUpgradeOverlay from '../components/ReportUpgradeOverlay';
@@ -63,23 +62,22 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
         }}>
           ⚙️ Personalizar
         </button>
-        <button onClick={() => {
-          if (userPlan !== 'max') {
-            setReportOverlay('needMax');
-          } else {
-            const wrappedData = generateWrappedData({ txs, objetivos, year: new Date().getFullYear() });
+        {/* Botão Wrapped — só visível em Janeiro, recapitulando o ano anterior */}
+        {new Date().getMonth() === 0 && (
+          <button onClick={() => {
+            const yearToRecap = new Date().getFullYear() - 1;
+            const wrappedData = generateWrappedData({ txs, objetivos, year: yearToRecap });
             if (wrappedData) onOpenWrapped(wrappedData.slides);
-            else dialog.alert({ title: 'Wrapped indisponível', message: 'Sem transações suficientes para gerar o Wrapped deste ano.' });
-          }
-        }} style={{
-          background: 'rgba(255,255,255,.04)', border: '1px solid rgba(123,127,255,.2)', borderRadius: 12,
-          padding: '9px 18px', color: '#7b7fff', fontSize: 12, fontWeight: 700,
-          cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 6,
-          transition: 'all .2s'
-        }}>
-          ✨ Wrapped {new Date().getFullYear()}
-          {userPlan !== 'max' && <span style={{ fontSize: 9, background: 'rgba(123,127,255,.12)', color: '#7b7fff', padding: '2px 6px', borderRadius: 6, fontWeight: 800 }}>MAX</span>}
-        </button>
+            else dialog.alert({ title: 'Wrapped indisponível', message: `Sem transações suficientes para gerar o Wrapped ${yearToRecap}.` });
+          }} style={{
+            background: 'rgba(255,255,255,.04)', border: '1px solid rgba(123,127,255,.2)', borderRadius: 12,
+            padding: '9px 18px', color: '#7b7fff', fontSize: 12, fontWeight: 700,
+            cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 6,
+            transition: 'all .2s'
+          }}>
+            ✨ Ver Wrapped {new Date().getFullYear() - 1}
+          </button>
+        )}
         <div style={{ position: 'relative' }}>
           <button onClick={() => {
             if (userPlan === 'free') {
@@ -377,12 +375,6 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
 
       {/* Subscriptions */}
       {show('subscriptions') && <SubscriptionsCard txs={txs} fmtV={fmtV} />}
-
-      {/* Separador visual */}
-      {show('subscriptions') && show('gamification') && <div style={{ height: 1, background: 'var(--border)', margin: '8px 0' }} />}
-
-      {/* Gamification */}
-      {show('gamification') && streak && <GamificationCard streak={streak} badges={badges || {}} newBadges={newBadges} />}
 
     </div>
   );

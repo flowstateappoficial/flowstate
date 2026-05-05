@@ -14,10 +14,10 @@ export const BADGE_DEFS = [
   // Saldo
   { id: 'positive_month',emoji: '🏆', nome: 'Mês Positivo',      desc: 'Terminaste um mês com saldo positivo' },
   { id: 'saved_more',    emoji: '📉', nome: 'Gastos em Queda',    desc: 'Gastaste menos que o mês anterior' },
-  // Taxa de Fuga
-  { id: 'fuga_30',       emoji: '🚀', nome: 'Fuga 30%',          desc: 'Taxa de Fuga atingiu 30%' },
-  { id: 'fuga_50',       emoji: '💪', nome: 'Fuga 50%',          desc: 'Taxa de Fuga atingiu 50%' },
-  { id: 'fuga_70',       emoji: '⚡', nome: 'Fuga Máxima',        desc: 'Taxa de Fuga atingiu 70%' },
+  // Taxa de Poupança
+  { id: 'fuga_30',       emoji: '🚀', nome: 'Poupança 30%',      desc: 'Taxa de Poupança atingiu 30%' },
+  { id: 'fuga_50',       emoji: '💪', nome: 'Poupança 50%',      desc: 'Taxa de Poupança atingiu 50%' },
+  { id: 'fuga_70',       emoji: '⚡', nome: 'Poupança Máxima',    desc: 'Taxa de Poupança atingiu 70%' },
   // Objetivos
   { id: 'first_goal',    emoji: '🎯', nome: 'Objetivo Definido',  desc: 'Criaste o primeiro objetivo' },
   { id: 'goal_done',     emoji: '✅', nome: 'Missão Cumprida',    desc: 'Atingiste 100% de um objetivo' },
@@ -27,7 +27,7 @@ export const BADGE_DEFS = [
   { id: 'streak_30',     emoji: '⚡', nome: 'Mês Imparável',      desc: 'Usaste a app 30 dias seguidos' },
   // Investimentos
   { id: 'first_invest',  emoji: '💰', nome: 'Investidor',         desc: 'Adicionaste o primeiro investimento' },
-  { id: 'emergency_fund',emoji: '🛡️', nome: 'Fundo de Paz',       desc: 'Criaste um fundo de emergência' },
+  { id: 'emergency_fund',emoji: '🛡️', nome: 'Fundo de Emergência', desc: 'Criaste um fundo de emergência' },
   // Budget
   { id: 'budget_set',    emoji: '📋', nome: 'Orçamento Criado',   desc: 'Definiste o teu orçamento mensal' },
   { id: 'under_budget',  emoji: '🎉', nome: 'Dentro do Limite',   desc: 'Ficaste dentro do orçamento num mês' },
@@ -114,7 +114,7 @@ export function evaluateBadges({ txs, objetivos, ativos, feEntries, budget, stre
     const r = unlockBadge('saved_more'); if (r.isNew) newlyUnlocked.push('saved_more');
   }
 
-  // Taxa de Fuga
+  // Taxa de Poupança (variável interna mantém o nome `fuga` por compatibilidade)
   if (totalIn > 0) {
     const fuga = Math.round(((totalIn - totalOut) / totalIn) * 100);
     if (fuga >= 30) { const r = unlockBadge('fuga_30'); if (r.isNew) newlyUnlocked.push('fuga_30'); }

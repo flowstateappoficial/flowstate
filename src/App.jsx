@@ -42,6 +42,7 @@ import ReferralInviteModal from './components/ReferralInviteModal';
 import ConvitesPage from './pages/ConvitesPage';
 import AdminInvitesPage from './pages/AdminInvitesPage';
 import WrappedStories from './components/WrappedStories';
+import { generateWrappedData } from './utils/wrappedAnalysis';
 import TrialBanner from './components/TrialBanner';
 import TrialOfferModal from './components/TrialOfferModal';
 import CancelTrialModal from './components/CancelTrialModal';
@@ -246,6 +247,35 @@ export default function App() {
     try { setRendimentoMensal(parseFloat(localStorage.getItem(LS_RENDIMENTO)) || 0); } catch {}
     try { const dp = localStorage.getItem('fs_dash_prefs_v1'); if (dp) setDashPrefs(JSON.parse(dp)); } catch {}
   }, []);
+
+  // ── WRAPPED AUTO-TRIGGER (1-31 Janeiro: abre Wrapped do ano anterior, uma vez) ──
+  const wrappedAutoCheckedRef = useRef(false);
+  useEffect(() => {
+    if (wrappedAutoCheckedRef.current) return;
+
+    const today = new Date();
+    // Só dispara em Janeiro (mês 0)
+    if (today.getMonth() !== 0) {
+      wrappedAutoCheckedRef.current = true;
+      return;
+    }
+
+    const yearToRecap = today.getFullYear() - 1;
+    const seenKey = `wrapped_seen_${yearToRecap}`;
+    if (localStorage.getItem(seenKey)) {
+      wrappedAutoCheckedRef.current = true;
+      return;
+    }
+
+    // Espera os dados carregarem (localStorage ou Supabase)
+    if (!txs || txs.length === 0) return;
+
+    const data = generateWrappedData({ txs, objetivos, year: yearToRecap });
+    if (data && data.slides && data.slides.length > 0) {
+      setWrappedSlides(data.slides);
+    }
+    wrappedAutoCheckedRef.current = true;
+  }, [txs, objetivos]);
 
   // ── GAMIFICATION: Update streak on app load + evaluate badges when data changes ──
   useEffect(() => {
@@ -1268,7 +1298,15 @@ export default function App() {
       {wrappedSlides && (
         <WrappedStories
           slides={wrappedSlides}
-          onClose={() => setWrappedSlides(null)}
+          onClose={() => {
+            // Marcar como visto se estamos na janela de Janeiro
+            const today = new Date();
+            if (today.getMonth() === 0) {
+              const yearToRecap = today.getFullYear() - 1;
+              try { localStorage.setItem(`wrapped_seen_${yearToRecap}`, '1'); } catch {}
+            }
+            setWrappedSlides(null);
+          }}
         />
       )}
 
