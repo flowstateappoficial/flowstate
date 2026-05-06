@@ -13,7 +13,6 @@ export default function PricingPage({ billingAnual, setBillingAnual, logo, onSho
   const trialExpired = trialStatus.expired;
   const fmt = v => v.toFixed(2).replace('.', ',') + ' €';
   const pPlus = billingAnual ? PRICES.plus.anual : PRICES.plus.mensal;
-  const pFreedom = billingAnual ? PRICES.freedom.anual : PRICES.freedom.mensal;
 
   const Check = () => (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" fill="rgba(0,215,100,.15)"/><path d="M5.5 9l2.5 2.5 5-5" stroke="#00D764" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -97,8 +96,8 @@ export default function PricingPage({ billingAnual, setBillingAnual, logo, onSho
           </div>
         )}
 
-        {/* Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: isMobile ? 14 : 20, alignItems: 'start' }}>
+        {/* Cards (2 tiers — single paid plan) */}
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? 14 : 20, alignItems: 'start', maxWidth: 760, margin: '0 auto' }}>
           {/* FREE */}
           <div style={{ background: 'rgba(255,255,255,.04)', backdropFilter: 'blur(20px)', borderRadius: 24, padding: '2.25rem 1.75rem', border: '1px solid rgba(255,255,255,.09)' }}>
             <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase', color: '#6e7491', marginBottom: '1.25rem' }}>Free</div>
@@ -127,8 +126,17 @@ export default function PricingPage({ billingAnual, setBillingAnual, logo, onSho
             </div>
             <div style={{ fontSize: 12, color: '#6e7491', marginBottom: '2rem' }}>{billingAnual ? `${fmt(pPlus * 12)}/ano` : 'Faturado mensalmente'}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: '2rem' }}>
-              {['Tudo do plano Free', 'Aba de Investimentos desbloqueada', 'Calculadora de investimentos', 'Objetivos ilimitados', 'Dicas avançadas de investimento'].map((f, i) => (
-                <div key={f} style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Check /><span style={{ fontSize: 13, color: '#9ba3c4', fontWeight: i === 1 || i === 2 ? 700 : 400 }}>{f}</span></div>
+              {[
+                { text: 'Tudo do plano Grátis', strong: true },
+                { text: 'Investimentos com investido vs. valor de mercado' },
+                { text: 'Fundo de Emergência educativo' },
+                { text: 'Calculadora de investimentos' },
+                { text: 'Objetivos ilimitados' },
+                { text: 'Deteção automática de subscrições' },
+                { text: 'Relatório mensal em PDF' },
+                { text: 'Suporte prioritário' }
+              ].map((f) => (
+                <div key={f.text} style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Check /><span style={{ fontSize: 13, color: '#9ba3c4', fontWeight: f.strong ? 700 : 400 }}>{f.text}</span></div>
               ))}
             </div>
             {isBetaActive ? (
@@ -146,29 +154,6 @@ export default function PricingPage({ billingAnual, setBillingAnual, logo, onSho
             )}
           </div>
 
-          {/* FLOW MAX */}
-          <div style={{ background: 'rgba(255,255,255,.04)', backdropFilter: 'blur(20px)', borderRadius: 24, padding: '2.25rem 1.75rem', border: '1px solid rgba(123,127,255,.3)' }}>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase', color: '#7b7fff', marginBottom: '1.25rem' }}>Flow Max</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: '.3rem' }}>
-              <span style={{ fontSize: '3rem', fontWeight: 800, color: '#fff', letterSpacing: '-.05em', lineHeight: 1 }}>{fmt(pFreedom)}</span>
-              <span style={{ fontSize: 13, color: '#6e7491' }}>/mês</span>
-            </div>
-            <div style={{ fontSize: 12, color: '#6e7491', marginBottom: '2rem' }}>{billingAnual ? `${fmt(pFreedom * 12)}/ano` : 'Faturado mensalmente'}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: '2rem' }}>
-              {['Tudo do Flow Plus', 'Relatório PDF mensal automático', 'Simulador de independência financeira', 'Análise IA de padrões de gastos', 'Suporte prioritário'].map((f, i) => (
-                <div key={f} style={{ display: 'flex', gap: 10, alignItems: 'center' }}><Check /><span style={{ fontSize: 13, color: '#9ba3c4', fontWeight: i >= 1 && i <= 3 ? 700 : 400 }}>{f}</span></div>
-              ))}
-            </div>
-            {isBetaActive ? (
-              <button disabled title="Disponível no final da beta" style={{ width: '100%', padding: 13, borderRadius: 12, background: 'rgba(123,127,255,.1)', color: '#7b7fff', border: '1px solid rgba(123,127,255,.25)', fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'not-allowed', opacity: .85 }}>
-                🔒 Disponível após a beta
-              </button>
-            ) : (
-              <button onClick={() => onSubscribe && onSubscribe('max')} style={{ width: '100%', padding: 13, borderRadius: 12, background: 'rgba(123,127,255,.15)', color: '#7b7fff', border: '1px solid rgba(123,127,255,.3)', fontFamily: 'Inter,sans-serif', fontSize: 10, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', cursor: 'pointer' }}>
-                Assinar Flow Max
-              </button>
-            )}
-          </div>
         </div>
       </div>
     </div>

@@ -78,9 +78,10 @@ export const BUDGET_CATS = [
   {cat:'Outro',       pct:.10, emoji:'📦'},
 ];
 
+// Pricing single-tier (€4.99/mês mensal; anual cobrado €47.90/ano = €3.99/mês equivalente).
+// Beta-testers ficam com Plus vitalício via flag is_lifetime na tabela subscriptions.
 export const PRICES = {
-  plus:    { mensal: 3.99,  anual: 2.99  },
-  freedom: { mensal: 7.99,  anual: 5.99  }
+  plus: { mensal: 4.99, anual: 3.99 }
 };
 
 export const PT_M = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];

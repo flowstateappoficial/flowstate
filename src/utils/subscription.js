@@ -20,7 +20,7 @@ export async function syncSubscription(userId) {
   try {
     const { data, error } = await sb
       .from('subscriptions')
-      .select('plan,status,billing_interval,current_period_end,trial_end,cancel_at_period_end,stripe_customer_id')
+      .select('plan,status,billing_interval,current_period_end,trial_end,cancel_at_period_end,stripe_customer_id,is_lifetime')
       .eq('user_id', userId)
       .maybeSingle();
     if (error) { console.warn('syncSubscription:', error.message); return null; }
@@ -30,7 +30,9 @@ export async function syncSubscription(userId) {
     }
     localStorage.setItem(LS_SUB_CACHE, JSON.stringify(data));
     // Keep legacy LS_PLAN in sync so the existing userPlan()/gating keeps working.
-    if (data.plan) localStorage.setItem(LS_PLAN_LEGACY, data.plan);
+    // is_lifetime (beta-tester grandfathered) força 'plus' independentemente do estado Stripe.
+    const effective = data.is_lifetime ? 'plus' : (data.plan || 'free');
+    localStorage.setItem(LS_PLAN_LEGACY, effective);
     // Keep legacy fs_trial_v1 in sync so the UI countdown keeps working when
     // the user is on a Stripe trial (status='trialing' + trial_end set).
     syncLocalTrialFromSubscription(data);
