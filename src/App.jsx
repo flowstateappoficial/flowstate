@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { LOGO_SRC } from './assets/logo';
-import { 
-  LS_TXS, LS_OBJ, LS_ATIVOS, LS_FE, LS_RULES, LS_PLAN, 
-  LS_ONBOARDED, LS_BUDGET, LS_RENDIMENTO
+import {
+  LS_TXS, LS_OBJ, LS_ATIVOS, LS_FE, LS_RULES, LS_PLAN,
+  LS_ONBOARDED, LS_BUDGET, LS_RENDIMENTO, LS_SUBS
 } from './utils/constants';
 import { fmtV, fmtDate, getCurrentMonth, txsComRegra, normalizeStr } from './utils/helpers';
-import { 
+import {
   getSupabaseClient, loadTxsFromSupabase, saveTxToSupabase, deleteTxFromSupabase,
   loadGoalsFromSupabase, saveGoalToSupabase, deleteGoalFromSupabase,
   loadInvestmentsFromSupabase, saveAtivoToSupabase, deleteAtivoFromSupabase, saveAtivoEntry, saveFundoEmergencia,
-  saveBudgetToSupabase, loadBudgetFromSupabase
+  saveBudgetToSupabase, loadBudgetFromSupabase,
+  loadRecurringsFromSupabase, saveRecurringToSupabase, deleteRecurringFromSupabase
 } from './utils/supabase';
 
 // ── Lazy-load pages ──
@@ -21,6 +22,7 @@ import useIsMobile from './hooks/useIsMobile';
 import AccountPage from './pages/AccountPage';
 import DashboardPage from './pages/DashboardPage';
 import TransactionsPage from './pages/TransactionsPage';
+import SubscriptionsPage from './pages/SubscriptionsPage';
 import InvestmentsPage from './pages/InvestmentsPage';
 import CalculatorPage from './pages/CalculatorPage';
 import PricingPage from './pages/PricingPage';
@@ -34,15 +36,16 @@ import LegalOverlay from './components/LegalOverlay';
 import PasswordResetOverlay from './components/PasswordResetOverlay';
 import { useDialog } from './components/Dialog';
 import { updateStreak, evaluateBadges } from './utils/gamification';
-import { evaluateNotifications, evaluateTrialNotifications, loadNotifications, loadReadIds, markAllRead as markAllReadUtil } from './utils/notifications';
+import { evaluateNotifications, evaluateTrialNotifications, evaluateSubscriptionNotifications, isSubsAlertSnoozedToday, snoozeSubsAlertForToday, loadNotifications, loadReadIds, markAllRead as markAllReadUtil } from './utils/notifications';
 import NotificationCenter from './components/NotificationCenter';
-import FeedbackButton from './components/FeedbackButton';
+import SubscriptionAlertModal from './components/SubscriptionAlertModal';
 import { initReferralData, sendInvite as sendReferralInvite, fetchReferralData, setPendingReferralCode, getPendingReferralCode, clearPendingReferralCode, applyReferralCode, logInviteShare } from './utils/referral';
 import ReferralInviteModal from './components/ReferralInviteModal';
 import ConvitesPage from './pages/ConvitesPage';
 import AdminInvitesPage from './pages/AdminInvitesPage';
 import WrappedStories from './components/WrappedStories';
 import { generateWrappedData } from './utils/wrappedAnalysis';
+import { getCurrentPeriodKey } from './utils/subscriptions';
 import TrialBanner from './components/TrialBanner';
 import TrialOfferModal from './components/TrialOfferModal';
 import CancelTrialModal from './components/CancelTrialModal';
@@ -68,6 +71,16 @@ export default function App() {
 
   // ── GOALS ──
   const [objetivos, setObjetivos] = useState([]);
+
+  // ── RECURRINGS (Subscrições) ──
+  // Lazy initial state — lê do localStorage SINCRONAMENTE na primeira render para
+  // evitar que o useEffect de persistência apague os dados em React 18 Strict Mode.
+  const [recurrings, setRecurrings] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LS_SUBS);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  });
 
   // ── INVESTMENTS ──
   const [ativos, setAtivos] = useState([]);
@@ -121,6 +134,11 @@ export default function App() {
 
   // ── DASHBOARD PREFS ──
   const [dashPrefs, setDashPrefs] = useState({ visible: ['hero','performance','budget','goals','subscriptions','gamification'] });
+
+  // ── SUBSCRIPTION ALERT (pop-up) ──
+  const [subAlertUrgent, setSubAlertUrgent] = useState(null);
+  // Gate: fica true só quando o utilizador fecha/snooza. Reset a cada app load.
+  const subAlertDismissedRef = useRef(false);
 
   // ── WRAPPED ──
   const [wrappedSlides, setWrappedSlides] = useState(null);
@@ -246,7 +264,27 @@ export default function App() {
     try { const d = localStorage.getItem(LS_BUDGET); if (d) setBudget(JSON.parse(d)); } catch {}
     try { setRendimentoMensal(parseFloat(localStorage.getItem(LS_RENDIMENTO)) || 0); } catch {}
     try { const dp = localStorage.getItem('fs_dash_prefs_v1'); if (dp) setDashPrefs(JSON.parse(dp)); } catch {}
+    // recurrings é carregado via lazy useState initializer (ver linha de declaração)
   }, []);
+
+  // ── PERSISTÊNCIA: recurrings → localStorage sempre que muda ──
+  useEffect(() => {
+    try { localStorage.setItem(LS_SUBS, JSON.stringify(recurrings || [])); } catch {}
+  }, [recurrings]);
+
+  // ── SUPABASE: carrega recurrings quando user fica disponível ──
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+    (async () => {
+      const remote = await loadRecurringsFromSupabase(currentUser.id);
+      if (!cancelled && Array.isArray(remote) && remote.length > 0) {
+        setRecurrings(remote);
+        try { localStorage.setItem(LS_SUBS, JSON.stringify(remote)); } catch {}
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
 
   // ── WRAPPED AUTO-TRIGGER (1-31 Janeiro: abre Wrapped do ano anterior, uma vez) ──
   const wrappedAutoCheckedRef = useRef(false);
@@ -329,15 +367,37 @@ export default function App() {
     });
     // Also evaluate trial-specific notifications
     const trialRes = evaluateTrialNotifications(getTrialStatus(), markNotified);
-    const merged = [...trialRes.newNotifs, ...all].slice(0, 50);
+    // And subscription notifications (sininho + identifica casos urgentes p/ pop-up)
+    const subRes = evaluateSubscriptionNotifications(recurrings);
+    const merged = [...subRes.newNotifs, ...trialRes.newNotifs, ...all].slice(0, 50);
     setNotifications(merged);
-    const allNew = [...newNotifs, ...trialRes.newNotifs];
+    const allNew = [...newNotifs, ...trialRes.newNotifs, ...subRes.newNotifs];
     if (allNew.length > 0) {
       const highPriority = allNew.find(n => n.priority === 'high') || allNew[0];
       setNotifToast(highPriority);
       setTimeout(() => setNotifToast(null), 5000);
     }
-  }, [viewMode, txs, objetivos, budget, rendimentoMensal, streak, trialTick]);
+  }, [viewMode, txs, objetivos, budget, rendimentoMensal, streak, trialTick, recurrings]);
+
+  // ── POP-UP "AVISO" das subscrições ──
+  // Reflecte sempre o estado actual: se adicionares uma sub urgente, o modal actualiza.
+  // Só pára de actualizar quando o utilizador fechar/snooza explicitamente.
+  useEffect(() => {
+    if (viewMode !== 'app') return;
+    if (subAlertDismissedRef.current) return;     // utilizador já fechou nesta sessão
+    if (isSubsAlertSnoozedToday()) {              // utilizador escolheu "Lembra amanhã"
+      subAlertDismissedRef.current = true;
+      return;
+    }
+    if (!recurrings || recurrings.length === 0) {
+      // Sem subs ainda — fecha modal se estava aberto
+      if (subAlertUrgent) setSubAlertUrgent(null);
+      return;
+    }
+    const { urgent } = evaluateSubscriptionNotifications(recurrings);
+    const total = (urgent.trials?.length || 0) + (urgent.lateSubs?.length || 0);
+    setSubAlertUrgent(total > 0 ? urgent : null);
+  }, [viewMode, recurrings]);
 
   // ── CLEAR ALL USER DATA (localStorage + state) ──
   const clearAllUserData = useCallback(() => {
@@ -686,6 +746,80 @@ export default function App() {
     return withIds.length;
   }, [txs, currentUser, saveTxsLocal]);
 
+  // ── RECURRING (Subscrições geridas pelo utilizador) ──
+  const addRecurring = useCallback(async (sub) => {
+    const local = sub.id ? sub : { ...sub, id: `local_${Date.now()}_${Math.random().toString(36).slice(2,7)}` };
+    setRecurrings(prev => [...prev, local]);
+    if (currentUser) {
+      const saved = await saveRecurringToSupabase(local, currentUser.id);
+      setRecurrings(prev => prev.map(s => s.id === local.id ? saved : s));
+    }
+  }, [currentUser]);
+
+  const updateRecurring = useCallback(async (sub) => {
+    const updated = { ...sub, updatedAt: new Date().toISOString() };
+    setRecurrings(prev => prev.map(s => s.id === sub.id ? updated : s));
+    if (currentUser) {
+      const saved = await saveRecurringToSupabase(updated, currentUser.id);
+      setRecurrings(prev => prev.map(s => s.id === sub.id ? saved : s));
+    }
+  }, [currentUser]);
+
+  const deleteRecurring = useCallback(async (id) => {
+    setRecurrings(prev => prev.filter(s => s.id !== id));
+    if (currentUser) {
+      await deleteRecurringFromSupabase(id, currentUser.id);
+    }
+  }, [currentUser]);
+
+  // Marcar período actual como pago. Cria transacção automaticamente.
+  const markRecurringPaid = useCallback(async (id, amountOverride = null) => {
+    const sub = recurrings.find(s => s.id === id);
+    if (!sub) return;
+
+    const periodKey = getCurrentPeriodKey(sub.cadence);
+    const amount = amountOverride != null ? Number(amountOverride) : Number(sub.defaultAmount || 0);
+
+    // 1. Cria transacção (despesa). addTransaction muta `tx.id` com o id atribuído.
+    const tx = {
+      desc: sub.name,
+      val: amount,
+      type: 'despesa',
+      cat: 'Outro',
+      date: new Date().toISOString().slice(0, 10),
+      fromRecurring: id
+    };
+    await addTransaction(tx);
+
+    // 2. Atualiza o registo do recurring com o pagamento
+    const updated = {
+      ...sub,
+      payments: {
+        ...(sub.payments || {}),
+        [periodKey]: { amount, paidAt: new Date().toISOString(), txId: tx.id }
+      },
+      updatedAt: new Date().toISOString()
+    };
+    setRecurrings(prev => prev.map(s => s.id === id ? updated : s));
+    if (currentUser) saveRecurringToSupabase(updated, currentUser.id).catch(() => {});
+  }, [recurrings, currentUser, addTransaction]);
+
+  // Desmarcar pagamento (e remover transacção associada)
+  const unmarkRecurringPaid = useCallback(async (id, periodKey = null) => {
+    const sub = recurrings.find(s => s.id === id);
+    if (!sub) return;
+    const key = periodKey || getCurrentPeriodKey(sub.cadence);
+    const removed = sub.payments?.[key];
+    if (removed?.txId) {
+      await deleteTransaction(removed.txId);
+    }
+    const newPayments = { ...(sub.payments || {}) };
+    delete newPayments[key];
+    const updated = { ...sub, payments: newPayments, updatedAt: new Date().toISOString() };
+    setRecurrings(prev => prev.map(s => s.id === id ? updated : s));
+    if (currentUser) saveRecurringToSupabase(updated, currentUser.id).catch(() => {});
+  }, [recurrings, currentUser, deleteTransaction]);
+
   // ── GOAL HELPERS ──
   const saveObjetivosLocal = useCallback((newObj) => {
     setObjetivos(newObj);
@@ -927,19 +1061,13 @@ export default function App() {
 
   if (viewMode === 'landing') {
     return (
-      <>
-        <LandingPage logo={LOGO_SRC} onShowAuth={() => setViewMode('auth')} />
-        <FeedbackButton defaultEmail="" />
-      </>
+      <LandingPage logo={LOGO_SRC} onShowAuth={() => setViewMode('auth')} />
     );
   }
 
   if (viewMode === 'auth') {
     return (
-      <>
-        <AuthPage logo={LOGO_SRC} onEnterApp={enterApp} onBack={() => setViewMode('landing')} />
-        <FeedbackButton defaultEmail="" />
-      </>
+      <AuthPage logo={LOGO_SRC} onEnterApp={enterApp} onBack={() => setViewMode('landing')} />
     );
   }
 
@@ -992,6 +1120,7 @@ export default function App() {
             dashPrefs={dashPrefs}
             onUpdateDashPrefs={(newPrefs) => { setDashPrefs(newPrefs); try { localStorage.setItem('fs_dash_prefs_v1', JSON.stringify(newPrefs)); } catch {} }}
             onOpenWrapped={(slides) => setWrappedSlides(slides)}
+            recurrings={recurrings}
           />
         )}
 
@@ -1009,6 +1138,19 @@ export default function App() {
             fmtV={fmtV}
             fmtDate={fmtDate}
             getCurrentMonth={getCurrentMonth}
+          />
+        )}
+
+        {activeTab === 'subs' && (
+          <SubscriptionsPage
+            recurrings={recurrings}
+            txs={txs}
+            onAddRecurring={addRecurring}
+            onUpdateRecurring={updateRecurring}
+            onDeleteRecurring={deleteRecurring}
+            onMarkRecurringPaid={markRecurringPaid}
+            onUnmarkRecurringPaid={unmarkRecurringPaid}
+            fmtV={fmtV}
           />
         )}
 
@@ -1306,6 +1448,41 @@ export default function App() {
               try { localStorage.setItem(`wrapped_seen_${yearToRecap}`, '1'); } catch {}
             }
             setWrappedSlides(null);
+          }}
+        />
+      )}
+
+      {/* Subscription Alert pop-up — uma vez por sessão se houver casos urgentes */}
+      {subAlertUrgent && (
+        <SubscriptionAlertModal
+          urgent={subAlertUrgent}
+          fmtV={fmtV}
+          onMarkPaid={async (subId, amountOverride) => {
+            await markRecurringPaid(subId, amountOverride);
+            // Remove a sub do bloco urgent (re-render do modal sem ela)
+            setSubAlertUrgent(prev => {
+              if (!prev) return null;
+              const next = {
+                trials: (prev.trials || []).filter(t => t.sub.id !== subId),
+                lateSubs: (prev.lateSubs || []).filter(l => l.sub.id !== subId)
+              };
+              const total = next.trials.length + next.lateSubs.length;
+              return total > 0 ? next : null;
+            });
+          }}
+          onOpenSub={(sub) => {
+            setActiveTab('subs');
+            subAlertDismissedRef.current = true;
+            setSubAlertUrgent(null);
+          }}
+          onSnooze={() => {
+            snoozeSubsAlertForToday();
+            subAlertDismissedRef.current = true;
+            setSubAlertUrgent(null);
+          }}
+          onClose={() => {
+            subAlertDismissedRef.current = true;
+            setSubAlertUrgent(null);
           }}
         />
       )}

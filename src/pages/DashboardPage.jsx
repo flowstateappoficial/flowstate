@@ -3,14 +3,13 @@ import useIsMobile from '../hooks/useIsMobile';
 import { BUDGET_CATS, CC, CB, PT_M, PT_MESES } from '../utils/constants';
 import { txsComRegra } from '../utils/helpers';
 import { getDicaDoDia } from '../utils/dicas';
-import SubscriptionsCard from '../components/SubscriptionsCard';
 import { openReportInNewTab, openReportPreviewInNewTab } from '../utils/reportGenerator';
 import ReportUpgradeOverlay from '../components/ReportUpgradeOverlay';
 import DashboardSettings from '../components/DashboardSettings';
 import { generateWrappedData } from '../utils/wrappedAnalysis';
 import { useDialog } from '../components/Dialog';
 
-export default function DashboardPage({ txs, txsWithRules, objetivos, budget, rendimentoMensal, onOpenTxModal, onSwitchTab, onEditGoal, onAddGoal, onDeleteGoal, onAddToGoal, onWithdrawFromGoal, onOpenBudget, onOpenBudgetEdit, fmtV, fmtDate, getCurrentMonth, streak, badges, newBadges, ativos, feEntries, userPlan, onViewPlans, dashPrefs, onUpdateDashPrefs, onOpenWrapped }) {
+export default function DashboardPage({ txs, txsWithRules, objetivos, budget, rendimentoMensal, onOpenTxModal, onSwitchTab, onEditGoal, onAddGoal, onDeleteGoal, onAddToGoal, onWithdrawFromGoal, onOpenBudget, onOpenBudgetEdit, fmtV, fmtDate, getCurrentMonth, streak, badges, newBadges, ativos, feEntries, userPlan, onViewPlans, dashPrefs, onUpdateDashPrefs, onOpenWrapped, recurrings = [] }) {
   const isMobile = useIsMobile();
   const dialog = useDialog();
   const [reportOverlay, setReportOverlay] = useState(null);
@@ -122,7 +121,7 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
                     return (
                       <button key={mo} disabled={disabled} onClick={() => {
                         setReportPickerOpen(false);
-                        const reportData = { txs, objetivos, ativos, feEntries, budget, rendimentoMensal, month: mo };
+                        const reportData = { txs, objetivos, ativos, feEntries, budget, rendimentoMensal, month: mo, recurrings };
                         if (userPlan === 'plus') {
                           openReportPreviewInNewTab({ ...reportData, canExport: false });
                         } else {
@@ -372,9 +371,6 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
           </div>
         </div>
       </div>}
-
-      {/* Subscriptions */}
-      {show('subscriptions') && <SubscriptionsCard txs={txs} fmtV={fmtV} />}
 
     </div>
   );

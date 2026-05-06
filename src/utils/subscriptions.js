@@ -1,5 +1,6 @@
-// ── SUBSCRIPTION / RECURRING EXPENSE DETECTION ENGINE ──
-// Analisa transações e identifica despesas recorrentes (subscrições)
+// ── SUBSCRIPTION / RECURRING EXPENSE — DETECTION (legacy) + USER-MANAGED (v2) ──
+// Detection engine continua activa (alimenta reportGenerator + camada de Sugestões na UI).
+// Por baixo, funções para gestão manual com checklist de pagamentos por período.
 
 // Keywords conhecidas de subscrições populares
 // priority: 'essencial' (utilities, housing), 'importante' (health, transport), 'opcional' (entertainment, extras)
@@ -191,4 +192,188 @@ export function detectSubscriptions(txs) {
     cancelable,
     savingIfCancel: Math.round(savingIfCancel * 100) / 100,
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// V2 — USER-MANAGED RECURRINGS (Subscrições inseridas manualmente)
+// ═══════════════════════════════════════════════════════════════════════
+
+import { SUB_CADENCES } from './constants';
+
+const cadenceMonths = id => (SUB_CADENCES.find(c => c.id === id) || SUB_CADENCES[0]).monthsBetween;
+const cadencePerYear = id => (SUB_CADENCES.find(c => c.id === id) || SUB_CADENCES[0]).perYear;
+
+/**
+ * Devolve a chave do período em que `date` cai, para uma dada cadência.
+ *  monthly    -> "2026-04"
+ *  quarterly  -> "2026-Q2"
+ *  semiannual -> "2026-H1"
+ *  annual     -> "2026"
+ */
+export function getPeriodKey(date, cadence) {
+  const d = date instanceof Date ? date : new Date(date);
+  const y = d.getFullYear();
+  const m = d.getMonth() + 1; // 1..12
+
+  switch (cadence) {
+    case 'annual':
+      return String(y);
+    case 'semiannual': {
+      const h = m <= 6 ? 1 : 2;
+      return `${y}-H${h}`;
+    }
+    case 'quarterly': {
+      const q = Math.floor((m - 1) / 3) + 1;
+      return `${y}-Q${q}`;
+    }
+    case 'monthly':
+    default:
+      return `${y}-${String(m).padStart(2, '0')}`;
+  }
+}
+
+export function getCurrentPeriodKey(cadence) {
+  return getPeriodKey(new Date(), cadence);
+}
+
+export function isPaidInPeriod(sub, periodKey) {
+  return !!(sub?.payments && sub.payments[periodKey]);
+}
+
+export function isPaidThisPeriod(sub) {
+  return isPaidInPeriod(sub, getCurrentPeriodKey(sub.cadence));
+}
+
+/** Activas = não canceladas */
+export function getActiveSubs(subs) {
+  return (subs || []).filter(s => !s.cancelledAt);
+}
+
+/** Cria um novo registo de subscrição com defaults sensatos */
+export function newSubscription(overrides = {}) {
+  return {
+    id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `sub_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+    name: '',
+    emoji: '💳',
+    defaultAmount: 0,
+    isVariable: false,
+    cadence: 'monthly',
+    dayOfPeriod: 1,
+    category: 'util',
+    isTrial: false,
+    trialEndDate: null,
+    trialReminded: false,
+    cancelledAt: null,
+    payments: {},
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...overrides
+  };
+}
+
+/** Marca a sub como paga no período actual. Retorna nova sub + dados da transação a criar. */
+export function markPaidNow(sub, amountOverride = null, txId = null) {
+  const periodKey = getCurrentPeriodKey(sub.cadence);
+  const amount = amountOverride ?? sub.defaultAmount;
+  const updated = {
+    ...sub,
+    payments: {
+      ...(sub.payments || {}),
+      [periodKey]: {
+        amount,
+        paidAt: new Date().toISOString(),
+        ...(txId ? { txId } : {})
+      }
+    },
+    updatedAt: new Date().toISOString()
+  };
+  return { sub: updated, periodKey, amount };
+}
+
+/** Desfaz o pagamento do período (ex: utilizador clicou por engano) */
+export function unmarkPayment(sub, periodKey) {
+  const periodKeyToRemove = periodKey || getCurrentPeriodKey(sub.cadence);
+  const newPayments = { ...(sub.payments || {}) };
+  const removed = newPayments[periodKeyToRemove];
+  delete newPayments[periodKeyToRemove];
+  return {
+    sub: { ...sub, payments: newPayments, updatedAt: new Date().toISOString() },
+    removed
+  };
+}
+
+/**
+ * Equivalente mensal (divide cadência anual por 12, etc.). Útil para totais comparáveis.
+ */
+export function getMonthlyEquivalent(sub) {
+  const perYear = cadencePerYear(sub.cadence);
+  return (sub.defaultAmount * perYear) / 12;
+}
+
+export function getYearlyEquivalent(sub) {
+  return sub.defaultAmount * cadencePerYear(sub.cadence);
+}
+
+/**
+ * Totais educacionais sobre uma lista de subscrições activas (não canceladas).
+ *  - mensal: soma dos equivalentes mensais
+ *  - anual:  soma dos equivalentes anuais
+ *  - byCategory: { essencial, util, corte } — em equivalente anual
+ *  - count
+ */
+export function getTotals(subs) {
+  const active = getActiveSubs(subs);
+  const monthly = active.reduce((s, sub) => s + getMonthlyEquivalent(sub), 0);
+  const yearly  = active.reduce((s, sub) => s + getYearlyEquivalent(sub), 0);
+
+  const byCategory = { essencial: 0, util: 0, corte: 0 };
+  for (const sub of active) {
+    const cat = ['essencial','util','corte'].includes(sub.category) ? sub.category : 'util';
+    byCategory[cat] += getYearlyEquivalent(sub);
+  }
+
+  return {
+    count: active.length,
+    monthly: Math.round(monthly * 100) / 100,
+    yearly: Math.round(yearly * 100) / 100,
+    byCategory: {
+      essencial: Math.round(byCategory.essencial * 100) / 100,
+      util:      Math.round(byCategory.util      * 100) / 100,
+      corte:     Math.round(byCategory.corte     * 100) / 100
+    }
+  };
+}
+
+/** Subscrições do período actual ainda não marcadas como pagas */
+export function getDueThisPeriod(subs) {
+  return getActiveSubs(subs).filter(s => !isPaidThisPeriod(s));
+}
+
+/** Subscrições do período actual já marcadas como pagas */
+export function getPaidThisPeriod(subs) {
+  return getActiveSubs(subs).filter(s => isPaidThisPeriod(s));
+}
+
+// ── TRIAL HELPERS ──
+
+/** Devolve nº de dias até o trial acabar. Negativo se já passou. null se sub não está em trial. */
+export function daysUntilTrialEnd(sub) {
+  if (!sub?.isTrial || !sub?.trialEndDate) return null;
+  const end = new Date(sub.trialEndDate);
+  const now = new Date();
+  const ms = end.getTime() - now.getTime();
+  return Math.ceil(ms / (1000 * 60 * 60 * 24));
+}
+
+/** Trial termina dentro de `daysAhead` dias (inclusive)? Default: 3 */
+export function isTrialEndingSoon(sub, daysAhead = 3) {
+  const d = daysUntilTrialEnd(sub);
+  return d !== null && d >= 0 && d <= daysAhead;
+}
+
+/** Devolve apenas as subs activas com trial a terminar em breve, ordenadas pelos mais próximos */
+export function getTrialsEndingSoon(subs, daysAhead = 3) {
+  return getActiveSubs(subs)
+    .filter(s => isTrialEndingSoon(s, daysAhead))
+    .sort((a, b) => daysUntilTrialEnd(a) - daysUntilTrialEnd(b));
 }

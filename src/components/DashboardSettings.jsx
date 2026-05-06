@@ -6,7 +6,6 @@ const WIDGETS = [
   { id: 'performance', label: 'Performance Mensal', desc: 'Comparação com o mês anterior', icon: '📊' },
   { id: 'budget', label: 'Orçamento', desc: 'Limites por categoria', icon: '📋' },
   { id: 'goals', label: 'Objetivos de Poupança', desc: 'Lista de objetivos + dica diária', icon: '🎯' },
-  { id: 'subscriptions', label: 'Subscrições', desc: 'Despesas recorrentes detetadas', icon: '🔄' },
 ];
 
 

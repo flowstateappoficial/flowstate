@@ -20,6 +20,10 @@ const NOTIF_TYPES = {
   trial_reminder:  { icon: '⏳', color: '#f7931a', label: 'Trial' },
   trial_urgent:    { icon: '⚡', color: '#e53935', label: 'Trial' },
   trial_expired:   { icon: '🔒', color: '#6e7491', label: 'Trial' },
+  sub_trial_ending:{ icon: '⏳', color: '#f7931a', label: 'Subscrição' },
+  sub_payment_due: { icon: '💳', color: '#7b7fff', label: 'Subscrição' },
+  sub_payment_late:{ icon: '⚠️', color: '#ff6b6b', label: 'Subscrição' },
+  sub_summary:     { icon: '🧾', color: '#00D764', label: 'Subscrições' },
 };
 
 export function getNotifType(type) {
@@ -243,4 +247,111 @@ export function evaluateTrialNotifications(trialStatus, markNotifiedFn) {
   const all = [...newNotifs, ...existing].slice(0, 50);
   saveNotifications(all);
   return { all, newNotifs };
+}
+
+// ── SUBSCRIPTION NOTIFICATIONS ──
+// Avalia subs activas e gera entradas no centro de notificações + identifica casos urgentes.
+// Retorna { all, newNotifs, urgent } onde urgent = subs que merecem pop-up de aviso.
+export function evaluateSubscriptionNotifications(recurrings) {
+  const existing = loadNotifications();
+  const existingKeys = new Set(existing.map(n => n._key).filter(Boolean));
+  const newNotifs = [];
+  const urgent = { trials: [], lateSubs: [] };
+
+  if (!Array.isArray(recurrings) || recurrings.length === 0) {
+    return { all: existing, newNotifs: [], urgent };
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayDay = today.getDate();
+
+  const periodKeyForToday = (cadence) => {
+    const y = today.getFullYear();
+    const m = today.getMonth() + 1;
+    switch (cadence) {
+      case 'annual': return String(y);
+      case 'semiannual': return `${y}-H${m <= 6 ? 1 : 2}`;
+      case 'quarterly': return `${y}-Q${Math.floor((m - 1) / 3) + 1}`;
+      case 'monthly':
+      default: return `${y}-${String(m).padStart(2, '0')}`;
+    }
+  };
+
+  const add = (key, type, title, message, priority) => {
+    const fullKey = `sub_${key}`;
+    if (existingKeys.has(fullKey)) return;
+    const n = createNotif(type, title, message, priority);
+    n._key = fullKey;
+    newNotifs.push(n);
+  };
+
+  for (const sub of recurrings) {
+    if (sub.cancelledAt) continue;
+
+    // 1. Trial a terminar em ≤3 dias
+    if (sub.isTrial && sub.trialEndDate) {
+      const end = new Date(sub.trialEndDate);
+      end.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((end.getTime() - today.getTime()) / 86400000);
+      if (diffDays >= 0 && diffDays <= 3) {
+        const dayLabel = diffDays === 0 ? 'hoje' : diffDays === 1 ? 'amanhã' : `em ${diffDays} dias`;
+        add(`trial_${sub.id}_${sub.trialEndDate}`, 'sub_trial_ending',
+          `Trial ${sub.name} termina ${dayLabel}`,
+          `Cancela antes do fim do trial para não seres cobrado ${(sub.defaultAmount || 0).toFixed(2)} €.`,
+          'high');
+        // Sempre adicionada ao bloco "urgent" para o pop-up considerar
+        urgent.trials.push({ sub, daysLeft: diffDays });
+      }
+    }
+
+    // 2. Sub vencida — pagamento previsto há ≥2 dias e ainda não marcada
+    if (sub.cadence === 'monthly') {
+      const pk = periodKeyForToday(sub.cadence);
+      const paid = !!(sub.payments && sub.payments[pk]);
+      if (!paid) {
+        const daysLate = todayDay - (sub.dayOfPeriod || 1);
+        if (daysLate >= 2) {
+          // Sininho a partir de 2 dias de atraso
+          add(`late_${sub.id}_${pk}`, 'sub_payment_late',
+            `${sub.name} em atraso há ${daysLate} ${daysLate === 1 ? 'dia' : 'dias'}`,
+            `Estava previsto para o dia ${sub.dayOfPeriod}. Marca como pago se já tratado.`,
+            'normal');
+          // Pop-up urgente a partir de 3 dias de atraso
+          if (daysLate >= 3) {
+            urgent.lateSubs.push({ sub, periodKey: pk, daysLate });
+          }
+        } else if (daysLate === 0) {
+          // Lembrete no próprio dia (no sininho, calmo)
+          add(`due_${sub.id}_${pk}`, 'sub_payment_due',
+            `${sub.name} prevista hoje`,
+            `Marca como pago quando confirmares o pagamento de ${(sub.defaultAmount || 0).toFixed(2)} €.`,
+            'low');
+        }
+      }
+    }
+  }
+
+  const all = [...newNotifs, ...existing].slice(0, 50);
+  saveNotifications(all);
+  return { all, newNotifs, urgent };
+}
+
+// ── Snooze do pop-up ──
+const LS_SUBS_ALERT_DISMISSED = 'fs_subs_alert_dismissed';
+
+export function isSubsAlertSnoozedToday() {
+  try {
+    const v = localStorage.getItem(LS_SUBS_ALERT_DISMISSED);
+    if (!v) return false;
+    const today = new Date().toISOString().slice(0, 10);
+    return v === today;
+  } catch { return false; }
+}
+
+export function snoozeSubsAlertForToday() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem(LS_SUBS_ALERT_DISMISSED, today);
+  } catch {}
 }

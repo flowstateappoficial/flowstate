@@ -6,11 +6,11 @@ import React from 'react';
 // Safe-area padding via env(safe-area-inset-bottom) for iOS notch/home indicator.
 
 const TABS = [
-  { id: 'dash',     label: 'Início',    icon: '🏠' },
-  { id: 'txs',      label: 'Contas',    icon: '💳' },
-  { id: 'inv',      label: 'Investir',  icon: '📈' },
-  { id: 'convites', label: 'Convites',  icon: '🎁' },
-  { id: 'account',  label: 'Conta',     icon: '👤' },
+  { id: 'dash',     label: 'Início',     icon: '🏠' },
+  { id: 'txs',      label: 'Contas',     icon: '💳' },
+  { id: 'subs',     label: 'Subs',       icon: '🔄' },
+  { id: 'inv',      label: 'Investir',   icon: '📈' },
+  { id: 'account',  label: 'Conta',      icon: '👤' },
 ];
 
 export default function BottomNav({ activeTab, onSwitchTab }) {

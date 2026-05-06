@@ -1,6 +1,7 @@
 // ── MONTHLY REPORT GENERATOR — PREMIUM DESIGN ──
-import { detectSubscriptions } from './subscriptions';
+import { detectSubscriptions, getActiveSubs, getMonthlyEquivalent, getYearlyEquivalent, getPeriodKey, isPaidInPeriod } from './subscriptions';
 import { LOGO_SRC } from '../assets/logo';
+import { SUB_CATEGORIES } from './constants';
 
 const PT_MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
@@ -8,7 +9,7 @@ function fmtE(val) {
   return (val || 0).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 }
 
-export function generateMonthlyReport({ txs, objetivos, ativos, feEntries, budget, rendimentoMensal, month }) {
+export function generateMonthlyReport({ txs, objetivos, ativos, feEntries, budget, rendimentoMensal, month, recurrings = [] }) {
   const [year, m] = (month || new Date().toISOString().slice(0, 7)).split('-').map(Number);
   const monthName = PT_MESES[m - 1] + ' ' + year;
   const ym = `${year}-${String(m).padStart(2, '0')}`;
@@ -34,8 +35,43 @@ export function generateMonthlyReport({ txs, objetivos, ativos, feEntries, budge
   const catSorted = Object.entries(catSpend).sort((a, b) => b[1] - a[1]);
 
   const topGoals = (objetivos || []).slice(0, 3);
-  const subs = detectSubscriptions(txs);
+  const subs = detectSubscriptions(txs); // legacy fallback (auto-detect)
   const topExpenses = curTxs.filter(t => t.type === 'despesa').sort((a, b) => b.val - a.val).slice(0, 5);
+
+  // ── User-managed recurrings (Subscrições v2) ──
+  // Computa estado para o mês do relatório, não para hoje.
+  const reportMonthDate = new Date(year, m - 1, 1);
+  const activeRecs = getActiveSubs(recurrings || []);
+  const recsThisMonth = activeRecs.filter(s => {
+    // Filtra só as que caem neste mês (igual à lógica do calendário)
+    if (s.cadence === 'monthly') return true;
+    if (s.cadence === 'quarterly') return [1, 4, 7, 10].includes(m);
+    if (s.cadence === 'semiannual') return [1, 7].includes(m);
+    if (s.cadence === 'annual') return m === 1;
+    return true;
+  });
+  let recPaidTotal = 0;
+  let recExpectedTotal = 0;
+  let recPaidCount = 0;
+  const recsWithStatus = recsThisMonth.map(s => {
+    const pk = getPeriodKey(reportMonthDate, s.cadence);
+    const paid = isPaidInPeriod(s, pk);
+    const paidAmount = paid ? (s.payments[pk]?.amount || 0) : 0;
+    recExpectedTotal += s.defaultAmount || 0;
+    if (paid) {
+      recPaidTotal += paidAmount;
+      recPaidCount += 1;
+    }
+    return { ...s, _paid: paid, _paidAmount: paidAmount, _periodKey: pk };
+  });
+  const recMonthlyEq = activeRecs.reduce((a, s) => a + getMonthlyEquivalent(s), 0);
+  const recYearlyEq = activeRecs.reduce((a, s) => a + getYearlyEquivalent(s), 0);
+  const recsByCategory = { essencial: 0, util: 0, corte: 0 };
+  for (const s of activeRecs) {
+    const cat = ['essencial', 'util', 'corte'].includes(s.category) ? s.category : 'util';
+    recsByCategory[cat] += getYearlyEquivalent(s);
+  }
+  const hasManagedRecs = activeRecs.length > 0;
 
   const catColors = {
     'Alimentação': '#00D764', 'Habitação': '#7b7fff', 'Transportes': '#00b4d8',
@@ -317,8 +353,39 @@ body{
       </table>
     </div>
     <div class="card">
-      <div class="card-lbl">Subscrições recorrentes</div>
-      ${subs.activeSubs.length > 0 ? `
+      <div class="card-lbl">Subscrições</div>
+      ${hasManagedRecs ? `
+        <!-- Subs geridas pelo utilizador (v2) -->
+        <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px">
+          <span style="font-size:24px;font-weight:800;color:#fff">${fmtE(recMonthlyEq)}</span>
+          <span style="font-size:11px;color:#4a5072">/mês</span>
+          <span style="font-size:11px;color:#4a5072;margin-left:auto">${fmtE(recYearlyEq)} /ano</span>
+        </div>
+        <div style="font-size:11px;color:${recPaidCount === recsThisMonth.length ? '#00D764' : '#f7931a'};margin-bottom:14px;font-weight:700">
+          ${recsThisMonth.length === 0 ? '—' :
+            recPaidCount === recsThisMonth.length
+              ? `✓ ${recPaidCount}/${recsThisMonth.length} pagas (${fmtE(recPaidTotal)})`
+              : `${recPaidCount}/${recsThisMonth.length} pagas · ${fmtE(recPaidTotal)} de ${fmtE(recExpectedTotal)}`
+          }
+        </div>
+        ${recsThisMonth.length > 0 ? `
+          <table class="tbl"><tbody>
+            ${recsWithStatus.slice(0, 6).map(s => {
+              const cat = SUB_CATEGORIES.find(c => c.id === s.category);
+              const dotColor = cat ? cat.color : '#6e7491';
+              const valColor = s._paid ? '#00D764' : '#ff6b6b';
+              const valLabel = s._paid ? `✓ ${fmtE(s._paidAmount)}` : fmtE(s.defaultAmount || 0);
+              return `<tr>
+                <td><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${dotColor};margin-right:6px;vertical-align:middle"></span>${s.emoji} ${s.name}</td>
+                <td style="color:${valColor}">${valLabel}</td>
+              </tr>`;
+            }).join('')}
+            ${recsThisMonth.length > 6 ? `<tr><td colspan="2" style="color:#4a5072;font-size:10px;text-align:center;padding-top:6px">+${recsThisMonth.length - 6} outras subscrições</td></tr>` : ''}
+          </tbody></table>
+        ` : '<div style="color:#4a5072;font-size:11px;padding:8px 0">Nenhuma subscrição prevista para este mês.</div>'}
+      ` : (subs.activeSubs.length > 0 ? `
+        <!-- Fallback: auto-detect (sem subs geridas) -->
+        <div style="font-size:10px;color:#4a5072;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Detectadas no histórico</div>
         <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:16px">
           <span style="font-size:24px;font-weight:800;color:#ff6b6b">${fmtE(subs.totalMensal)}</span>
           <span style="font-size:11px;color:#4a5072">/mês</span>
@@ -330,7 +397,8 @@ body{
             <td style="color:#ff6b6b">${fmtE(s.lastVal)}</td>
           </tr>`).join('')}
         </tbody></table>
-      ` : '<div style="color:#4a5072;font-size:12px;padding:20px 0;text-align:center">Nenhuma subscrição detetada</div>'}
+        <div style="color:#4a5072;font-size:10px;margin-top:10px;font-style:italic">Adiciona-as à tua lista em Subscrições para teres controlo de checklist mensal.</div>
+      ` : '<div style="color:#4a5072;font-size:12px;padding:20px 0;text-align:center">Nenhuma subscrição registada</div>')}
     </div>
   </div>
 </div>

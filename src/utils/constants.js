@@ -13,6 +13,23 @@ export const LS_PLAN = 'fs_plan_v1';
 export const LS_ONBOARDED = 'fs_onboarded_v1';
 export const LS_BUDGET = 'fs_budget_v1';
 export const LS_RENDIMENTO = 'fs_rendimento_v1';
+export const LS_SUBS = 'fs_recurrings_v1';
+
+// ── SUBSCRIPTIONS — categorias e cadências ──
+export const SUB_CATEGORIES = [
+  { id: 'essencial', label: 'Essencial',       desc: 'Não cancelável (renda, água, luz, seguros)', color: '#7b7fff' },
+  { id: 'util',      label: 'Útil',            desc: 'Tem valor real mas é cancelável',            color: '#00D764' },
+  { id: 'corte',     label: 'Possível corte',  desc: 'Avalia se ainda usas',                       color: '#f7931a' }
+];
+
+export const SUB_CADENCES = [
+  { id: 'monthly',    label: 'Mensal',     monthsBetween: 1,  perYear: 12 },
+  { id: 'quarterly',  label: 'Trimestral', monthsBetween: 3,  perYear: 4  },
+  { id: 'semiannual', label: 'Semestral',  monthsBetween: 6,  perYear: 2  },
+  { id: 'annual',     label: 'Anual',      monthsBetween: 12, perYear: 1  }
+];
+
+export const SUB_DEFAULT_EMOJIS = ['💳','🎬','🎵','📺','🏠','💧','⚡','🔥','📡','🚗','🛡️','🏥','💪','📚','☁️','🍕','🎮','📱','💼','✏️','🎓','🌐'];
 
 // ── CATEGORIES ──
 export const CATS = ['Alimentação','Habitação','Transportes','Lazer','Saúde','Investimento','Poupança','Rendimento','Outro'];

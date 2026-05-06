@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import useIsMobile from '../hooks/useIsMobile';
 import InstallAppButton from './InstallAppButton';
-import FeedbackButton from './FeedbackButton';
 
 const PLAN_CFG = {
   free: { label: 'FREE', bg: 'rgba(110,116,145,.2)', color: '#6e7491', border: '1px solid rgba(110,116,145,.3)' },
@@ -14,6 +13,7 @@ const ADMIN_EMAILS = ['flowstate.app.oficial@gmail.com'];
 const BASE_TABS = [
   { id: 'dash', label: 'Dashboard' },
   { id: 'txs', label: 'Transações' },
+  { id: 'subs', label: 'Subscrições' },
   { id: 'inv', label: 'Investimentos' },
   { id: 'convites', label: '🎁 Convites' },
   { id: 'pricing', label: '⚡ Planos', className: 'pricing-tab' },
@@ -87,9 +87,6 @@ export default function Navbar({ logo, activeTab, onSwitchTab, userPlan, userEma
         </div>
       )}
       <div className="nav-right" style={isMobile ? { gap: 8 } : undefined}>
-        {/* Feedback button (beta fechada) */}
-        <FeedbackButton variant="navbar" defaultEmail={userEmail || ''} />
-
         {/* Install PWA button (auto-hides if not applicable) */}
         <InstallAppButton />
 

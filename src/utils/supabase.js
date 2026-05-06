@@ -234,3 +234,98 @@ export async function loadBudgetFromSupabase(userId) {
   } catch (e) {}
   return null;
 }
+
+// ── USER RECURRINGS (Subscrições geridas pelo utilizador) ──
+// Tabela: public.user_recurrings (ver supabase/migrations/20260505_user_recurrings.sql)
+
+function rowToRecurring(r) {
+  return {
+    id: r.id,
+    name: r.name,
+    emoji: r.emoji || '💳',
+    defaultAmount: parseFloat(r.default_amount) || 0,
+    isVariable: !!r.is_variable,
+    cadence: r.cadence || 'monthly',
+    dayOfPeriod: r.day_of_period || 1,
+    category: r.category || 'util',
+    isTrial: !!r.is_trial,
+    trialEndDate: r.trial_end_date,
+    trialReminded: !!r.trial_reminded,
+    cancelledAt: r.cancelled_at,
+    payments: r.payments || {},
+    createdAt: r.created_at,
+    updatedAt: r.updated_at
+  };
+}
+
+function recurringToRow(s, userId) {
+  return {
+    user_id: userId,
+    name: s.name,
+    emoji: s.emoji || '💳',
+    default_amount: s.defaultAmount || 0,
+    is_variable: !!s.isVariable,
+    cadence: s.cadence || 'monthly',
+    day_of_period: s.dayOfPeriod || 1,
+    category: s.category || 'util',
+    is_trial: !!s.isTrial,
+    trial_end_date: s.trialEndDate || null,
+    trial_reminded: !!s.trialReminded,
+    cancelled_at: s.cancelledAt || null,
+    payments: s.payments || {}
+  };
+}
+
+export async function loadRecurringsFromSupabase(userId) {
+  const sb = getSupabaseClient();
+  if (!sb || !userId) return null;
+  try {
+    const { data, error } = await sb
+      .from('user_recurrings')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+    if (error) { console.warn('loadRecurrings:', error.message); return null; }
+    return (data || []).map(rowToRecurring);
+  } catch (e) { console.warn('loadRecurrings:', e); return null; }
+}
+
+export async function saveRecurringToSupabase(sub, userId) {
+  const sb = getSupabaseClient();
+  if (!sb || !userId) return sub;
+  const row = recurringToRow(sub, userId);
+  try {
+    // Se já tem id válido (uuid do supabase), update; senão insert
+    if (sub.id && typeof sub.id === 'string' && sub.id.includes('-')) {
+      const { data, error } = await sb
+        .from('user_recurrings')
+        .update(row)
+        .eq('id', sub.id)
+        .eq('user_id', userId)
+        .select('*')
+        .maybeSingle();
+      if (error) { console.warn('saveRecurring update:', error.message); return sub; }
+      return data ? rowToRecurring(data) : sub;
+    } else {
+      const { data, error } = await sb
+        .from('user_recurrings')
+        .insert([row])
+        .select('*')
+        .single();
+      if (error) { console.warn('saveRecurring insert:', error.message); return sub; }
+      return data ? rowToRecurring(data) : sub;
+    }
+  } catch (e) {
+    console.warn('saveRecurring:', e);
+    return sub;
+  }
+}
+
+export async function deleteRecurringFromSupabase(id, userId) {
+  const sb = getSupabaseClient();
+  if (!sb || !userId || !id) return;
+  try {
+    await sb.from('user_recurrings').delete().eq('id', id).eq('user_id', userId);
+  } catch (e) { console.warn('deleteRecurring:', e); }
+}
+
