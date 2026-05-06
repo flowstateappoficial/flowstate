@@ -121,6 +121,33 @@ export async function startCheckout({ plan = 'plus', interval = 'month', withTri
   window.location.href = data.url;
 }
 
+// Cancel (or reactivate) the user's Stripe subscription server-side.
+// Sets cancel_at_period_end=true on Stripe; the webhook propagates state to BD.
+// Returns the updated row after polling, or throws on failure.
+export async function cancelSubscription({ reactivate = false } = {}) {
+  const sb = getSupabaseClient();
+  if (!sb) throw new Error('supabase_unavailable');
+
+  const { data, error } = await sb.functions.invoke('cancel-subscription', {
+    body: { reactivate },
+  });
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error || 'cancel_failed');
+
+  // The webhook will propagate via customer.subscription.updated. Poll briefly
+  // so the caller can refresh the UI immediately after.
+  const { data: userRes } = await sb.auth.getUser();
+  const userId = userRes?.user?.id;
+  if (userId) {
+    for (let i = 0; i < 6; i++) {
+      const row = await syncSubscription(userId);
+      if (row && !!row.cancel_at_period_end === !reactivate) return row;
+      await new Promise(r => setTimeout(r, 800));
+    }
+  }
+  return data;
+}
+
 // Open Stripe Billing Portal (hosted page to cancel / upgrade / update card / invoices).
 // Redirects the browser. Requires the user already has a stripe_customer_id.
 export async function openCustomerPortal({ returnTo } = {}) {

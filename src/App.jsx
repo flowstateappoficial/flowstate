@@ -50,7 +50,7 @@ import TrialBanner from './components/TrialBanner';
 import TrialOfferModal from './components/TrialOfferModal';
 import CancelTrialModal from './components/CancelTrialModal';
 import { startTrial as startTrialUtil, effectivePlan, getTrialStatus, markConverted, markNotified, cancelTrial as cancelTrialUtil, reactivateTrial as reactivateTrialUtil, processExpiry, getChargeDate } from './utils/trial';
-import { startCheckout, syncSubscription, pollSubscriptionUntilActive } from './utils/subscription';
+import { startCheckout, syncSubscription, pollSubscriptionUntilActive, cancelSubscription, readCachedSubscription } from './utils/subscription';
 import useBetaStatus from './hooks/useBetaStatus';
 
 export default function App() {
@@ -236,13 +236,45 @@ export default function App() {
     }
   }, [trialTick]);
 
-  const handleCancelTrial = useCallback(() => {
+  const handleCancelTrial = useCallback(async () => {
+    // If the user has a Stripe-backed subscription, cancel server-side via
+    // edge function (sets cancel_at_period_end=true on Stripe). Otherwise
+    // fall back to legacy local cancel for users not yet on Stripe.
+    const cached = readCachedSubscription();
+    if (cached?.stripe_customer_id) {
+      try {
+        await cancelSubscription({ reactivate: false });
+        // syncSubscription was called inside cancelSubscription; it already
+        // updated LS_TRIAL via syncLocalTrialFromSubscription.
+        bumpTrial();
+        setCancelTrialOpen(false);
+      } catch (e) {
+        console.error('cancel-subscription failed', e);
+        dialog.alert({
+          title: 'Não foi possível cancelar',
+          message: 'Tenta novamente ou usa o portal de gestão (Conta → Subscrições).',
+        });
+        setCancelTrialOpen(false);
+      }
+      return;
+    }
+    // Legacy / non-Stripe local trial.
     cancelTrialUtil();
     bumpTrial();
     setCancelTrialOpen(false);
-  }, [bumpTrial]);
+  }, [bumpTrial, dialog]);
 
-  const handleReactivateTrial = useCallback(() => {
+  const handleReactivateTrial = useCallback(async () => {
+    const cached = readCachedSubscription();
+    if (cached?.stripe_customer_id) {
+      try {
+        await cancelSubscription({ reactivate: true });
+        bumpTrial();
+      } catch (e) {
+        console.error('reactivate failed', e);
+      }
+      return;
+    }
     reactivateTrialUtil();
     bumpTrial();
   }, [bumpTrial]);
