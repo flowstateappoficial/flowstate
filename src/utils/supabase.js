@@ -291,12 +291,17 @@ export async function loadRecurringsFromSupabase(userId) {
 }
 
 export async function saveRecurringToSupabase(sub, userId) {
+  // DEBUG: logs explícitos para diagnosticar saves silenciosos em produção
+  console.log('[saveRec] called with', { subId: sub?.id, name: sub?.name, userId });
   const sb = getSupabaseClient();
-  if (!sb || !userId) return sub;
+  if (!sb) { console.warn('[saveRec] no supabase client'); return sub; }
+  if (!userId) { console.warn('[saveRec] no userId'); return sub; }
   const row = recurringToRow(sub, userId);
+  console.log('[saveRec] row to insert/update:', row);
   try {
-    // Se já tem id válido (uuid do supabase), update; senão insert
-    if (sub.id && typeof sub.id === 'string' && sub.id.includes('-')) {
+    const isUpdate = sub.id && typeof sub.id === 'string' && sub.id.includes('-');
+    console.log('[saveRec] path:', isUpdate ? 'UPDATE' : 'INSERT');
+    if (isUpdate) {
       const { data, error } = await sb
         .from('user_recurrings')
         .update(row)
@@ -304,19 +309,24 @@ export async function saveRecurringToSupabase(sub, userId) {
         .eq('user_id', userId)
         .select('*')
         .maybeSingle();
-      if (error) { console.warn('saveRecurring update:', error.message); return sub; }
+      if (error) { console.error('[saveRec] update error:', error); return sub; }
+      console.log('[saveRec] update success, data:', data);
       return data ? rowToRecurring(data) : sub;
     } else {
-      const { data, error } = await sb
+      const { data, error, status, statusText } = await sb
         .from('user_recurrings')
         .insert([row])
         .select('*')
         .single();
-      if (error) { console.warn('saveRecurring insert:', error.message); return sub; }
+      if (error) {
+        console.error('[saveRec] insert error:', error, 'status:', status, statusText);
+        return sub;
+      }
+      console.log('[saveRec] insert success, data:', data, 'status:', status);
       return data ? rowToRecurring(data) : sub;
     }
   } catch (e) {
-    console.warn('saveRecurring:', e);
+    console.error('[saveRec] exception:', e);
     return sub;
   }
 }
