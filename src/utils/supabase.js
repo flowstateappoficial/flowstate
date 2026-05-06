@@ -291,16 +291,13 @@ export async function loadRecurringsFromSupabase(userId) {
 }
 
 export async function saveRecurringToSupabase(sub, userId) {
-  // DEBUG: logs explícitos para diagnosticar saves silenciosos em produção
-  console.log('[saveRec] called with', { subId: sub?.id, name: sub?.name, userId });
   const sb = getSupabaseClient();
-  if (!sb) { console.warn('[saveRec] no supabase client'); return sub; }
-  if (!userId) { console.warn('[saveRec] no userId'); return sub; }
+  if (!sb || !userId) return sub;
   const row = recurringToRow(sub, userId);
-  console.log('[saveRec] row to insert/update:', row);
   try {
+    // IDs do Supabase são UUIDs (têm hífens). IDs locais usam prefixo `local_` (sem hífens).
+    // Esta distinção é crítica — ver newSubscription() em subscriptions.js.
     const isUpdate = sub.id && typeof sub.id === 'string' && sub.id.includes('-');
-    console.log('[saveRec] path:', isUpdate ? 'UPDATE' : 'INSERT');
     if (isUpdate) {
       const { data, error } = await sb
         .from('user_recurrings')
@@ -309,24 +306,19 @@ export async function saveRecurringToSupabase(sub, userId) {
         .eq('user_id', userId)
         .select('*')
         .maybeSingle();
-      if (error) { console.error('[saveRec] update error:', error); return sub; }
-      console.log('[saveRec] update success, data:', data);
+      if (error) { console.warn('saveRecurring update:', error.message); return sub; }
       return data ? rowToRecurring(data) : sub;
     } else {
-      const { data, error, status, statusText } = await sb
+      const { data, error } = await sb
         .from('user_recurrings')
         .insert([row])
         .select('*')
         .single();
-      if (error) {
-        console.error('[saveRec] insert error:', error, 'status:', status, statusText);
-        return sub;
-      }
-      console.log('[saveRec] insert success, data:', data, 'status:', status);
+      if (error) { console.warn('saveRecurring insert:', error.message); return sub; }
       return data ? rowToRecurring(data) : sub;
     }
   } catch (e) {
-    console.error('[saveRec] exception:', e);
+    console.warn('saveRecurring:', e);
     return sub;
   }
 }

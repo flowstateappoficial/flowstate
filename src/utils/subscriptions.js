@@ -249,10 +249,13 @@ export function getActiveSubs(subs) {
   return (subs || []).filter(s => !s.cancelledAt);
 }
 
-/** Cria um novo registo de subscrição com defaults sensatos */
+/** Cria um novo registo de subscrição com defaults sensatos.
+ *  IMPORTANTE: id usa prefixo `local_` (sem hífens) para distinguir de UUIDs do Supabase.
+ *  saveRecurringToSupabase usa `id.includes('-')` para identificar IDs vindas da BD; se o local
+ *  for UUID, o save vai pelo caminho do UPDATE em vez de INSERT e a sub nunca é gravada. */
 export function newSubscription(overrides = {}) {
   return {
-    id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `sub_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+    id: `local_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
     name: '',
     emoji: '💳',
     defaultAmount: 0,

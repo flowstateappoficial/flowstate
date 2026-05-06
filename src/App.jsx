@@ -751,13 +751,9 @@ export default function App() {
   const addRecurring = useCallback(async (sub) => {
     const local = sub.id ? sub : { ...sub, id: `local_${Date.now()}_${Math.random().toString(36).slice(2,7)}` };
     setRecurrings(prev => [...prev, local]);
-    console.log('[addRec] currentUser:', currentUser ? { id: currentUser.id, email: currentUser.email } : 'NULL');
     if (currentUser) {
       const saved = await saveRecurringToSupabase(local, currentUser.id);
-      console.log('[addRec] saved:', saved);
       setRecurrings(prev => prev.map(s => s.id === local.id ? saved : s));
-    } else {
-      console.warn('[addRec] currentUser is null - sub stays local only');
     }
   }, [currentUser]);
 
