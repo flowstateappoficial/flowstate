@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { getSupabaseClient } from '../utils/supabase';
 import useIsMobile from '../hooks/useIsMobile';
+import useBetaStatus from '../hooks/useBetaStatus';
 import LegalOverlay from '../components/LegalOverlay';
 
 export default function AuthPage({ logo, onEnterApp, onBack }) {
   const isMobile = useIsMobile();
+  const { isBetaActive } = useBetaStatus();
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
@@ -42,33 +44,39 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
         setLoading(false);
         return;
       }
-      // ── Beta fechada: validar convite OU código de referral antes do registo ──
-      // Aceitamos duas formas de entrada:
-      //   • FS-XXXXXX  → beta_invite (gerado pelo admin)
-      //   • FLOWxxxxxx → referral_code (de um utilizador existente)
-      let codeType = null;  // 'beta' | 'referral'
+      // ── Validação de código:
+      //   • Durante beta fechada, código é OBRIGATÓRIO (FS-XXXXXX ou FLOW...)
+      //   • Após beta terminar, código é OPCIONAL — se preenchido (referral
+      //     de um amigo) é validado e aplicado; se vazio, signup prossegue normal.
+      let codeType = null;  // 'beta' | 'referral' | null
       if (mode === 'register') {
         const code = inviteCode.trim().toUpperCase();
         if (!code) {
-          setError('Precisas de um código de convite para criar conta durante a beta fechada.');
-          setLoading(false);
-          return;
-        }
-
-        // Tenta primeiro referral (mais comum — partilhado por amigos)
-        const { data: isReferral } = await sb.rpc('fs_validate_referral_code', { p_code: code });
-        if (isReferral) {
-          codeType = 'referral';
-          try { localStorage.setItem('fs_pending_referral_code', code); } catch {}
-        } else {
-          // Fallback: beta_invite FS-XXXXXX
-          const { data: isBeta, error: invErr } = await sb.rpc('validate_beta_invite', { p_code: code });
-          if (invErr || !isBeta) {
-            setError('Código inválido, já usado ou expirado.');
+          if (isBetaActive) {
+            setError('Precisas de um código de convite para criar conta durante a beta fechada.');
             setLoading(false);
             return;
           }
-          codeType = 'beta';
+          // Beta terminada e sem código → prossegue sem validar
+        } else {
+          // Há código, valida sempre (beta-invite ou referral)
+          const { data: isReferral } = await sb.rpc('fs_validate_referral_code', { p_code: code });
+          if (isReferral) {
+            codeType = 'referral';
+            try { localStorage.setItem('fs_pending_referral_code', code); } catch {}
+          } else {
+            const { data: isBeta, error: invErr } = await sb.rpc('validate_beta_invite', { p_code: code });
+            if (invErr || !isBeta) {
+              if (isBetaActive) {
+                setError('Código inválido, já usado ou expirado.');
+                setLoading(false);
+                return;
+              }
+              // Beta terminada e código inválido → ignora código e prossegue
+            } else {
+              codeType = 'beta';
+            }
+          }
         }
       }
 
@@ -330,13 +338,13 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
             </div>
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: '#00D764', marginBottom: 6 }}>
-                🎟️ Código de convite
+                🎟️ Código de convite {!isBetaActive && <span style={{ color: '#6e7491', fontWeight: 500 }}>(opcional)</span>}
               </label>
               <input
                 value={inviteCode}
                 onChange={e => setInviteCode(e.target.value.toUpperCase())}
                 type="text"
-                placeholder="FS-XXXXXX ou FLOW..."
+                placeholder={isBetaActive ? 'FS-XXXXXX ou FLOW...' : 'FLOW... (se um amigo te recomendou)'}
                 maxLength={16}
                 style={{
                   width: '100%', height: 42, padding: '0 14px',
@@ -348,7 +356,9 @@ export default function AuthPage({ logo, onEnterApp, onBack }) {
                 }}
               />
               <p style={{ fontSize: 10, color: '#6e7491', marginTop: 4, textAlign: 'center' }}>
-                Beta fechada — código de convite ou código de um amigo
+                {isBetaActive
+                  ? 'Beta fechada — código de convite ou código de um amigo'
+                  : 'Tens um código de um amigo? Mete aqui — senão deixa em branco.'}
               </p>
             </div>
           </>
