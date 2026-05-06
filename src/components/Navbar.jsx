@@ -77,6 +77,7 @@ export default function Navbar({ logo, activeTab, onSwitchTab, userPlan, userEma
           {TABS.map(tab => (
             <button
               key={tab.id}
+              data-tab={tab.id}
               className={`nav-tab${activeTab === tab.id ? ' active' : ''}`}
               onClick={() => onSwitchTab(tab.id)}
               style={tab.id === 'pricing' ? { color: '#00D764' } : undefined}

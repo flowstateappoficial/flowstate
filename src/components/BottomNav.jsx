@@ -40,6 +40,7 @@ export default function BottomNav({ activeTab, onSwitchTab }) {
         return (
           <button
             key={tab.id}
+            data-tab={tab.id}
             onClick={() => onSwitchTab(tab.id)}
             aria-current={active ? 'page' : undefined}
             aria-label={tab.label}

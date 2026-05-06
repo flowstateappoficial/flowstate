@@ -33,10 +33,10 @@ const WELCOME_SLIDES = [
     highlight: 'Tudo em português e adaptado ao mercado PT.',
   },
   {
-    icon: '🏆',
-    title: 'Gamificação — Mantém-te motivado',
-    desc: 'Ganha badges por conquistas como "7 dias seguidos" ou "primeiro objetivo concluído". Mantém o streak ativo para subires de nível.',
-    highlight: 'Quanto mais usas, mais recompensas desbloqueias!',
+    icon: '🔄',
+    title: 'Subscrições — Nunca mais és apanhado',
+    desc: 'Adiciona Netflix, Spotify, ginásio, telecomunicações e tudo o que paga sozinho. O Flowstate avisa-te dias antes de seres cobrado e mostra o calendário completo num só sítio.',
+    highlight: 'Marca subscrições para cancelar e descobre quanto poupas.',
   },
 ];
 

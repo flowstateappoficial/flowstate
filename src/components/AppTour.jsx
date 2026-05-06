@@ -11,36 +11,43 @@ const TOUR_STEPS = [
     tabId: 'dash',
     icon: '🏠',
     title: 'Dashboard',
-    desc: 'O teu centro de comando financeiro. Aqui vês o resumo do mês, gráficos de gastos, progresso dos objetivos e o teu streak de utilização.',
-    tip: 'Volta aqui sempre que quiseres ver como estão as tuas finanças.',
+    desc: 'O teu centro de comando financeiro. Resumo do mês, comparação com o mês anterior, gráficos de gastos por categoria e progresso dos objetivos.',
+    tip: 'Volta aqui sempre que quiseres saber como estão as tuas finanças.',
   },
   {
     tabId: 'txs',
     icon: '💳',
     title: 'Transações',
-    desc: 'Regista despesas e rendimentos. Cada transação é automaticamente categorizada e afeta o teu orçamento mensal.',
-    tip: 'Usa o botão + no canto inferior para adicionar rapidamente.',
+    desc: 'Regista despesas e rendimentos. Cada transação é categorizada e afeta o teu orçamento mensal.',
+    tip: 'Usa o botão + para adicionar rapidamente.',
+  },
+  {
+    tabId: 'subs',
+    icon: '🔄',
+    title: 'Subscrições',
+    desc: 'Centraliza Netflix, Spotify, ginásio, telecomunicações e tudo o resto que paga sozinho. O Flowstate avisa-te antes de seres cobrado e mostra o calendário mensal num só sítio.',
+    tip: 'Marca subscrições para cancelar e vê quanto poupas.',
   },
   {
     tabId: 'inv',
     icon: '📈',
     title: 'Investimentos',
-    desc: 'Acompanha ETFs, PPRs, ações e o teu fundo de emergência. Vê gráficos de evolução e retorno acumulado.',
-    tip: 'Funcionalidade Premium — experimenta grátis durante o período de teste.',
+    desc: 'Acompanha ETFs, PPRs, ações e o teu fundo de emergência. Vê evolução, retorno acumulado e contribuições mensais.',
+    tip: 'Funcionalidade do Flow Plus — começas com 7 dias grátis.',
   },
   {
     tabId: 'convites',
     icon: '🎁',
     title: 'Convites',
-    desc: 'Convida amigos para o Flowstate e ganha recompensas. Quantos mais convidares, mais benefícios desbloqueias.',
-    tip: 'Partilha o teu código único com quem queiras ajudar.',
+    desc: 'Convida amigos para o Flowstate e ganha extensões de trial e badges. Quantos mais convidares, mais benefícios desbloqueias.',
+    tip: 'Partilha o teu código único com quem ainda não conhece.',
   },
   {
     tabId: 'account',
     icon: '👤',
     title: 'A tua conta',
-    desc: 'Gere o teu perfil, plano de subscrição, orçamento mensal e preferências da app.',
-    tip: 'Aqui podes ajustar categorias de orçamento a qualquer momento.',
+    desc: 'Gere perfil, subscrição, orçamento mensal e exporta o relatório PDF do mês.',
+    tip: 'Aqui podes ajustar categorias do orçamento a qualquer altura.',
   },
 ];
 
@@ -58,14 +65,13 @@ export default function AppTour({ onFinish, onSwitchTab, isMobile }) {
     }
   }, [currentStep, step, onSwitchTab]);
 
-  // Position the tooltip near the relevant nav item
+  // Position the tooltip near the relevant nav item.
+  // Uses data-tab attribute (set on each nav button in Navbar.jsx + BottomNav.jsx)
+  // so the lookup is robust to ordering changes.
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        // Find the nav button for this tab
-        const buttons = document.querySelectorAll('nav[role="navigation"] button');
-        const tabIndex = TOUR_STEPS.findIndex(s => s.tabId === step.tabId);
-        const btn = buttons[tabIndex];
+        const btn = document.querySelector(`[data-tab="${step.tabId}"]`);
         if (btn) {
           const rect = btn.getBoundingClientRect();
           if (isMobile) {
@@ -83,6 +89,14 @@ export default function AppTour({ onFinish, onSwitchTab, isMobile }) {
               anchor: 'top',
             });
           }
+        } else {
+          // Tab button isn't visible (e.g. desktop 'account' lives inside the
+          // avatar dropdown). Center the tooltip vertically on screen.
+          setTooltipPos({
+            top: Math.max(120, window.innerHeight / 2 - 200),
+            left: window.innerWidth / 2,
+            anchor: 'top',
+          });
         }
       } catch {}
     }, 100);
