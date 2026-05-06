@@ -406,17 +406,18 @@ export default function App() {
     // própria flag, que deve persistir entre logins.
     const keysToRemove = [
       LS_TXS, LS_OBJ, LS_ATIVOS, LS_FE, LS_RULES, LS_PLAN,
-      LS_BUDGET, LS_RENDIMENTO,
+      LS_BUDGET, LS_RENDIMENTO, LS_SUBS,
       'fs_dash_prefs_v1', 'fs_inv_entries_v1', 'fs_inv_contribs_v1', 'fs_fe_contribs_v1',
       'fs_streak_v1', 'fs_badges_v1',
       'fs_notifications_v1', 'fs_notifications_read_v1',
       'fs_pending_referral_code', 'fs_referral_cache_v2',
       'fs_sub_v1', 'fs_trial_v1', 'fs_sub_prefs_v1',
-      'fuga_meta_v1',
+      'fuga_meta_v1', 'fs_subs_alert_dismissed',
     ];
     keysToRemove.forEach(k => { try { localStorage.removeItem(k); } catch {} });
     setTxs([]); setObjetivos([]); setAtivos([]); setAtivoEntries({}); setAtivoContribs({}); setFeEntries({}); setFeContribs({});
     setBudget({}); setRendimentoMensal(0); setUserRules([]);
+    setRecurrings([]);
     setDashPrefs({ visible: ['hero','performance','budget','goals','subscriptions','gamification'] });
     setStreak({ current: 0, best: 0, lastDate: null }); setBadges([]);
     setNotifications([]); setReadIds([]);
