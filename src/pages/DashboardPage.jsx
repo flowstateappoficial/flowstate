@@ -355,7 +355,6 @@ export default function DashboardPage({ txs, txsWithRules, objetivos, budget, re
         <div className="card daily-card">
           <div className="daily-header">
             <span className="daily-title">Daily Flow</span>
-            <span className="daily-num">#{dica.num}</span>
           </div>
           <span className="daily-cat">{dica.cat}</span>
           <div className="daily-quote">{dica.txt}</div>
