@@ -1,15 +1,18 @@
 import React from 'react';
 
 // ── BottomNav ──
-// Fixed bottom tab bar shown on mobile (useIsMobile). Matches the top Navbar's
-// 5 main tabs and adds a compact 'Conta' tab (normally inside the avatar dropdown).
-// Safe-area padding via env(safe-area-inset-bottom) for iOS notch/home indicator.
+// Fixed bottom tab bar shown on mobile (useIsMobile). Espelha as 5 tabs
+// principais do Navbar desktop + Convites + Conta. Total: 6 tabs.
+// Tipografia compacta (9.5px) e padding apertado para caberem em ecrãs
+// pequenos (iPhone SE ~375px = ~62px por tab) sem cortar labels.
+// Safe-area padding via env(safe-area-inset-bottom) para o notch iOS.
 
 const TABS = [
   { id: 'dash',     label: 'Início',     icon: '🏠' },
   { id: 'txs',      label: 'Contas',     icon: '💳' },
   { id: 'subs',     label: 'Subs',       icon: '🔄' },
   { id: 'inv',      label: 'Investir',   icon: '📈' },
+  { id: 'convites', label: 'Convites',   icon: '🎁' },
   { id: 'account',  label: 'Conta',      icon: '👤' },
 ];
 
@@ -51,8 +54,8 @@ export default function BottomNav({ activeTab, onSwitchTab }) {
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 3,
-              padding: '8px 2px 10px',
+              gap: 2,
+              padding: '8px 1px 10px',
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
@@ -74,11 +77,11 @@ export default function BottomNav({ activeTab, onSwitchTab }) {
                 background: '#00D764',
               }} />
             )}
-            <span style={{ fontSize: 20, lineHeight: 1, opacity: active ? 1 : 0.85 }}>{tab.icon}</span>
+            <span style={{ fontSize: 19, lineHeight: 1, opacity: active ? 1 : 0.85 }}>{tab.icon}</span>
             <span style={{
-              fontSize: 10,
+              fontSize: 9.5,
               fontWeight: active ? 800 : 600,
-              letterSpacing: '.02em',
+              letterSpacing: 0,
               whiteSpace: 'nowrap',
             }}>
               {tab.label}
