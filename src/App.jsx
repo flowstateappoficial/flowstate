@@ -51,6 +51,8 @@ import TrialOfferModal from './components/TrialOfferModal';
 import CancelTrialModal from './components/CancelTrialModal';
 import { startTrial as startTrialUtil, effectivePlan, getTrialStatus, markConverted, markNotified, cancelTrial as cancelTrialUtil, reactivateTrial as reactivateTrialUtil, processExpiry, getChargeDate } from './utils/trial';
 import { startCheckout, syncSubscription, pollSubscriptionUntilActive, cancelSubscription, readCachedSubscription } from './utils/subscription';
+import BlogIndex from './pages/BlogIndex';
+import BlogArticle from './pages/BlogArticle';
 import useBetaStatus from './hooks/useBetaStatus';
 
 export default function App() {
@@ -62,6 +64,26 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [viewMode, setViewMode] = useState('loading'); // 'loading' | 'landing' | 'auth' | 'app'
   const [activeTab, setActiveTab] = useState('dash');
+
+  // ── BLOG ROUTING ──
+  // O blog vive em /blog (lista) e /blog/<slug> (artigo individual). É uma
+  // sub-zona pública do site, independente do estado de autenticação. O
+  // pathname é observado via History API (popstate event), o que permite
+  // navegação SPA-style sem recarregar a página.
+  const [blogPath, setBlogPath] = useState(() =>
+    (typeof window !== 'undefined' && window.location.pathname.startsWith('/blog'))
+      ? window.location.pathname
+      : null
+  );
+
+  useEffect(() => {
+    const onPop = () => {
+      const p = window.location.pathname;
+      setBlogPath(p.startsWith('/blog') ? p : null);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   // ── TRANSACTIONS ──
   const [txs, setTxs] = useState([]);
@@ -1086,6 +1108,18 @@ export default function App() {
   const txsWithRules = txsComRegra(txs);
 
   // ── RENDER ──
+
+  // Blog tem precedência sobre todos os outros modos. É público, não requer
+  // auth, e tanto utilizadores autenticados como anónimos podem aceder. Se o
+  // path for /blog ou /blog/<slug>, mostramos o blog em vez da app/landing.
+  if (blogPath) {
+    if (blogPath === '/blog' || blogPath === '/blog/') {
+      return <BlogIndex logo={LOGO_SRC} />;
+    }
+    const slug = blogPath.replace(/^\/blog\//, '').replace(/\/$/, '');
+    return <BlogArticle slug={slug} logo={LOGO_SRC} />;
+  }
+
   if (viewMode === 'loading') {
     return <div style={{ minHeight: '100vh', background: '#141829', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <img src={LOGO_SRC} alt="Flowstate" style={{ height: 120, animation: 'pulse 2s infinite' }} />
