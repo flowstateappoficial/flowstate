@@ -254,6 +254,38 @@ export default function BlogArticle({ slug, logo }) {
 
               a: (props) => <a style={{ color: ACCENT, textDecoration: 'underline', textUnderlineOffset: 3, fontWeight: 600 }} {...props} />,
 
+              // Imagens: largura total da coluna, cantos arredondados, sombra
+              // subtil, e a alt-text aparece como legenda em baixo (caption).
+              img: ({ src, alt, ...props }) => (
+                <figure style={{ margin: '40px -40px', textAlign: 'center' }}>
+                  <img
+                    src={src}
+                    alt={alt}
+                    style={{
+                      width: '100%',
+                      maxWidth: '100%',
+                      height: 'auto',
+                      borderRadius: 14,
+                      boxShadow: '0 12px 40px rgba(0,0,0,.15), 0 0 0 1px rgba(0,0,0,.04)',
+                      display: 'block',
+                    }}
+                    {...props}
+                  />
+                  {alt && (
+                    <figcaption style={{
+                      marginTop: 12,
+                      fontSize: 13,
+                      color: MUTED,
+                      fontStyle: 'italic',
+                      lineHeight: 1.5,
+                      padding: '0 24px',
+                    }}>
+                      {alt}
+                    </figcaption>
+                  )}
+                </figure>
+              ),
+
               strong: (props) => <strong style={{ fontWeight: 700, color: TEXT }} {...props} />,
 
               em: (props) => <em style={{ fontStyle: 'italic', color: '#3f3f3f' }} {...props} />,
