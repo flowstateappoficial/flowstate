@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import BlogLayout from '../components/BlogLayout';
 import { getPostBySlug, getAllPosts } from '../blog/posts';
+import useIsMobile from '../hooks/useIsMobile';
 
 /*
   BlogArticle — renderiza um artigo individual com tipografia editorial.
@@ -72,6 +73,7 @@ function ReadingProgress() {
 
 export default function BlogArticle({ slug, logo }) {
   const post = getPostBySlug(slug);
+  const isMobile = useIsMobile();
 
   // Reset scroll quando navegamos para um artigo (SPA não faz isso sozinho).
   useEffect(() => {
@@ -164,11 +166,11 @@ export default function BlogArticle({ slug, logo }) {
           </div>
 
           <h1 style={{
-            fontSize: 46,
+            fontSize: isMobile ? 30 : 46,
             fontWeight: 800,
             letterSpacing: '-0.025em',
             color: TEXT,
-            lineHeight: 1.1,
+            lineHeight: 1.15,
             margin: '0 0 24px',
           }}>
             {post.title}
@@ -205,21 +207,21 @@ export default function BlogArticle({ slug, logo }) {
               // H2 com pequeno dot accent antes (eyebrow visual)
               h2: ({ children, ...props }) => (
                 <h2 style={{
-                  fontSize: 30,
+                  fontSize: isMobile ? 24 : 30,
                   fontWeight: 800,
-                  margin: '56px 0 20px',
+                  margin: isMobile ? '40px 0 16px' : '56px 0 20px',
                   letterSpacing: '-0.015em',
                   lineHeight: 1.2,
                   position: 'relative',
-                  paddingLeft: 20,
+                  paddingLeft: isMobile ? 16 : 20,
                 }} {...props}>
                   <span style={{
                     position: 'absolute',
                     left: 0,
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    width: 6,
-                    height: 28,
+                    width: isMobile ? 5 : 6,
+                    height: isMobile ? 22 : 28,
                     background: ACCENT,
                     borderRadius: 3,
                   }} />
@@ -256,8 +258,9 @@ export default function BlogArticle({ slug, logo }) {
 
               // Imagens: largura total da coluna, cantos arredondados, sombra
               // subtil, e a alt-text aparece como legenda em baixo (caption).
+              // Em mobile, sem margin negativo (causaria overflow).
               img: ({ src, alt, ...props }) => (
-                <figure style={{ margin: '40px -40px', textAlign: 'center' }}>
+                <figure style={{ margin: isMobile ? '32px 0' : '40px -40px', textAlign: 'center' }}>
                   <img
                     src={src}
                     alt={alt}
@@ -293,13 +296,13 @@ export default function BlogArticle({ slug, logo }) {
               // Blockquote com aspas decorativas grandes
               blockquote: ({ children, ...props }) => (
                 <blockquote style={{
-                  margin: '36px 0',
-                  padding: '28px 32px 28px 64px',
+                  margin: isMobile ? '28px 0' : '36px 0',
+                  padding: isMobile ? '20px 18px 20px 44px' : '28px 32px 28px 64px',
                   background: SOFT,
                   borderLeft: `4px solid ${ACCENT}`,
                   borderRadius: '0 12px 12px 0',
                   fontStyle: 'italic',
-                  fontSize: 20,
+                  fontSize: isMobile ? 16 : 20,
                   lineHeight: 1.6,
                   color: '#0f5c44',
                   position: 'relative',
@@ -308,8 +311,8 @@ export default function BlogArticle({ slug, logo }) {
                   <span style={{
                     position: 'absolute',
                     top: 4,
-                    left: 18,
-                    fontSize: 64,
+                    left: isMobile ? 10 : 18,
+                    fontSize: isMobile ? 44 : 64,
                     color: ACCENT,
                     opacity: 0.35,
                     fontFamily: 'Georgia, serif',

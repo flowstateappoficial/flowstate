@@ -1,12 +1,16 @@
 import React from 'react';
+import useIsMobile from '../hooks/useIsMobile';
 
 /*
   BlogLayout — wrapper para todas as páginas do blog (index + artigos).
   Tema CLARO (fundo branco, texto escuro), em contraste com a app que tem
   tema escuro. Razão: leitura longa cansa menos olhos em fundo claro.
 
-  Header: logo + link para a app (à direita).
-  Footer: link de volta para a home + créditos.
+  Responsivo:
+  - Desktop: logo grande (120px), botão CTA largo "Conhecer o Flowstate →"
+  - Mobile: logo pequeno (44px), botão compacto "App →", padding reduzido
+
+  Header sticky no topo. Footer simples.
 */
 
 const ACCENT = '#00805A';
@@ -15,6 +19,8 @@ const MUTED  = '#6b7280';
 const BORDER = '#e5e7eb';
 
 export default function BlogLayout({ children, logo }) {
+  const isMobile = useIsMobile();
+
   // Logo e link "Artigos" voltam ao índice do blog (convenção: clicar no logo
   // numa secção leva ao topo dessa secção, não para fora dela).
   const goBlog = (e) => {
@@ -51,51 +57,72 @@ export default function BlogLayout({ children, logo }) {
         <div style={{
           maxWidth: 960,
           margin: '0 auto',
-          padding: '8px 32px',
+          padding: isMobile ? '10px 16px' : '8px 32px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 16,
+          gap: isMobile ? 8 : 16,
         }}>
-          <a href="/blog" onClick={goBlog} style={{ display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none' }}>
+          {/* Logo + "BLOG" label */}
+          <a href="/blog" onClick={goBlog} style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: isMobile ? 10 : 14,
+            textDecoration: 'none',
+            minWidth: 0, // permite truncar se necessário
+          }}>
             {logo && (
               <img
                 src={logo}
                 alt="Flowstate"
                 style={{
-                  height: 120,
+                  height: isMobile ? 40 : 120,
                   width: 'auto',
                   display: 'block',
-                  // Logo original é branco (desenhado p/ fundo escuro da app).
-                  // Em fundo claro, brightness(0) converte tudo a preto sólido,
-                  // mantendo formas mas invertendo a luminosidade.
+                  flexShrink: 0,
+                  // brightness(0) → silhueta preta sólida para destacar no fundo branco.
                   filter: 'brightness(0)',
                 }}
               />
             )}
             <span style={{
-              fontSize: 14,
+              fontSize: isMobile ? 11 : 14,
               fontWeight: 700,
               color: TEXT,
-              letterSpacing: '.08em',
+              letterSpacing: isMobile ? '.1em' : '.08em',
               borderLeft: `1px solid ${BORDER}`,
-              paddingLeft: 14,
+              paddingLeft: isMobile ? 10 : 14,
+              whiteSpace: 'nowrap',
             }}>BLOG</span>
           </a>
-          <nav style={{ display: 'flex', alignItems: 'center', gap: 18, fontSize: 14 }}>
-            <a href="/blog" onClick={goBlog} style={{ color: MUTED, textDecoration: 'none', fontWeight: 600 }}>
+
+          {/* Nav direita */}
+          <nav style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: isMobile ? 10 : 18,
+            fontSize: isMobile ? 13 : 14,
+            flexShrink: 0,
+          }}>
+            <a href="/blog" onClick={goBlog} style={{
+              color: MUTED,
+              textDecoration: 'none',
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+            }}>
               Artigos
             </a>
             <a href="/" onClick={goHome} style={{
               color: '#fff',
               background: ACCENT,
-              padding: '8px 14px',
+              padding: isMobile ? '7px 12px' : '8px 14px',
               borderRadius: 8,
               textDecoration: 'none',
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: isMobile ? 12 : 13,
+              whiteSpace: 'nowrap',
             }}>
-              Conhecer o Flowstate →
+              {isMobile ? 'App →' : 'Conhecer o Flowstate →'}
             </a>
           </nav>
         </div>
@@ -105,7 +132,7 @@ export default function BlogLayout({ children, logo }) {
       <main style={{
         maxWidth: 960,
         margin: '0 auto',
-        padding: '56px 32px 96px',
+        padding: isMobile ? '32px 20px 64px' : '56px 32px 96px',
       }}>
         {children}
       </main>
@@ -114,7 +141,7 @@ export default function BlogLayout({ children, logo }) {
       <footer style={{
         borderTop: `1px solid ${BORDER}`,
         background: '#fafafa',
-        padding: '32px 24px',
+        padding: isMobile ? '24px 20px' : '32px 24px',
         textAlign: 'center',
         fontSize: 13,
         color: MUTED,

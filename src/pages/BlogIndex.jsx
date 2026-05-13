@@ -1,6 +1,7 @@
 import React from 'react';
 import BlogLayout from '../components/BlogLayout';
 import { getAllPosts } from '../blog/posts';
+import useIsMobile from '../hooks/useIsMobile';
 
 /*
   BlogIndex — lista de artigos publicados, ordenados por data desc.
@@ -22,6 +23,7 @@ function formatDate(iso) {
 
 export default function BlogIndex({ logo }) {
   const posts = getAllPosts();
+  const isMobile = useIsMobile();
 
   const openPost = (slug) => (e) => {
     e.preventDefault();
@@ -32,9 +34,9 @@ export default function BlogIndex({ logo }) {
   return (
     <BlogLayout logo={logo}>
       {/* Hero do blog */}
-      <section style={{ marginBottom: 56 }}>
+      <section style={{ marginBottom: isMobile ? 40 : 56 }}>
         <h1 style={{
-          fontSize: 44,
+          fontSize: isMobile ? 32 : 44,
           fontWeight: 800,
           letterSpacing: '-0.02em',
           color: TEXT,
@@ -44,7 +46,7 @@ export default function BlogIndex({ logo }) {
           O Blog Flowstate.
         </h1>
         <p style={{
-          fontSize: 18,
+          fontSize: isMobile ? 16 : 18,
           color: MUTED,
           lineHeight: 1.65,
           margin: 0,
@@ -95,7 +97,7 @@ export default function BlogIndex({ logo }) {
             </div>
 
             <h2 style={{
-              fontSize: 26,
+              fontSize: isMobile ? 20 : 26,
               fontWeight: 800,
               letterSpacing: '-0.01em',
               color: TEXT,
